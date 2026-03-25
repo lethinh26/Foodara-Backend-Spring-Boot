@@ -9,7 +9,7 @@ import java.time.LocalDate;
 @Setter
 @Getter
 public class ExampleCreationRequest {
-    @Size(min = 3, message = "Username must be at least 3 character")
+    @Size(min = 3, message = "Username must be at least 3 character") // size -> giới hạn độ dài của chuổi
     private String username;
 
     @Size(min = 8, message = "Password must be at least 8 character")
