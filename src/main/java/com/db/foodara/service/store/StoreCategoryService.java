@@ -27,7 +27,7 @@ public class StoreCategoryService {
         storeCategory.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
         storeCategory.setActive(request.getIsActive() == null || request.getIsActive());
         storeCategory.setCreatedAt(LocalDateTime.now());
-        
+
 
         return storeCategoryRepository.save(storeCategory);
     }

@@ -7,7 +7,7 @@ import lombok.Setter;
 @Setter
 @Getter
 public class StoreCategoryCreateDto {
-    @Size(min = 1, message = "Name must be at least 1 character")
+    @Size(min = 3, message = "Name must be at least 3 character")
     private String name;
     private String slug;
     private String iconUrl;
