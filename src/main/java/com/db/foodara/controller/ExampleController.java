@@ -28,6 +28,7 @@ public class ExampleController {
 
     @GetMapping()
     List<Example> getUser() {
+
         return exampleService.getUser();
     }
 
