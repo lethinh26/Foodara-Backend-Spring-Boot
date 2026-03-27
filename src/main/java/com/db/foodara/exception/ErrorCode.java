@@ -9,6 +9,8 @@ public enum ErrorCode {
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error"),
     USERNAME_INVALID(1003, "Username must be at least 3 characters"),
     PASSWORD_INVALID(1004, "Password must be at least 8 characters"),
+    EMAIL_INVALID(1005, "Email isn't valid"),
+    PHONE_INVALID(1006, "Phone isn't valid"),
 
     ;
     private int code;
