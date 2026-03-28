@@ -1,12 +1,11 @@
 package com.db.foodara.controller;
 
-import com.db.foodara.dto.request.ApiResponse;
+import com.db.foodara.dto.reponse.ApiResponse;
 import com.db.foodara.dto.request.ExampleCreationRequest;
 import com.db.foodara.dto.request.ExampleUpdateRequest;
 import com.db.foodara.entity.Example;
 import com.db.foodara.service.ExampleService;
 import jakarta.validation.Valid;
-import org.apache.catalina.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,6 +44,6 @@ public class ExampleController {
     @DeleteMapping("/{userId}")
     String deleteUser(@PathVariable String userId) {
         exampleService.deleteUser(userId);
-        return "User has ben deleted";
+        return "user has ben deleted";
     }
 }

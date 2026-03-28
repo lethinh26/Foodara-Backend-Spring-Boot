@@ -37,7 +37,7 @@ public class ExampleService {
     }
 
     public Example getUser(String id) {
-        return exampleRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+        return exampleRepository.findById(id).orElseThrow(() -> new RuntimeException("user not found"));
     }
 
     public Example updateUser(String userId, ExampleUpdateRequest request) {
