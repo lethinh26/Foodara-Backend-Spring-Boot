@@ -11,24 +11,24 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Entity
-public class UserEntity {
-    // lớp lưu tru user
+@Table(name = "users")
+public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id; // sài dữ liệu dạng uuid
+    private String id;
 
     @Pattern(
             regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}$",
             message = "EMAIL_INVALID"
     )
-    @Column(nullable = false, length = 255) // @column -> đại diện cho 1 cot trong bảng
+    @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = false, length = 255)
     @Size(min = 6, message = "PASSWORD_INVALID")
     private String passwordHash;
 
-    @Column(length = 255)
+    @Column(name = "full_name", length = 255)
     @Size(min = 8, message = "USERNAME_INVALID")
     private String fullName;
 
@@ -39,21 +39,33 @@ public class UserEntity {
     )
     private String phone;
 
-    @Column(length = 500)
+    @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
     @Column(length = 20)
     private String status;
 
-    @Column
+    @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
 
-    @Column
+    @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    @Column(updatable = false)
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        if (status == null) status = "active";
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
