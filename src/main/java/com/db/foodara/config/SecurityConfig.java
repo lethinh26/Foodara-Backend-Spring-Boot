@@ -2,6 +2,7 @@ package com.db.foodara.config;
 
 import com.db.foodara.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -37,29 +38,31 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh-token").permitAll()
-                        .requestMatchers("/api/auth/verify-email", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/home/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/stores/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/menu-items/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/locations/**").permitAll()
-                        .requestMatchers("/api/payments/webhook").permitAll()
+                        // Public auth endpoints (paths relative to context-path /api)
+                        .requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh-token").permitAll()
+                        .requestMatchers("/v1/auth/verify-email", "/v1/auth/forgot-password", "/v1/auth/reset-password").permitAll()
+                        // Public read endpoints
+                        .requestMatchers(HttpMethod.GET, "/home/**", "/search/**", "/stores/**", "/menu-items/**", "/locations/**").permitAll()
+                        .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/ws/**").permitAll()
-
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                        .requestMatchers("/api/merchant/**").hasAnyRole("MERCHANT", "ADMIN")
-
-                        .requestMatchers("/api/driver/**").hasAnyRole("DRIVER", "ADMIN")
-
+                        // Everything else requires auth
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // Prevent Spring Boot from auto-registering JwtAuthenticationFilter as a servlet filter
+    // (it should only run within the Spring Security filter chain)
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
