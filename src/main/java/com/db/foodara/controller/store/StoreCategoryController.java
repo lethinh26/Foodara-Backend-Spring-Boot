@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/store-categories")
+@RequestMapping("/v1/store-categories")
 public class StoreCategoryController {
     @Autowired
     private StoreCategoryService storeCategoryService;

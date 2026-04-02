@@ -69,6 +69,10 @@ public class UserService {
     public AddressResponse createAddress(String userId, AddressRequest request) {
         UserAddress address = new UserAddress();
         address.setUserId(userId);
+        return getAddressResponse(userId, request, address);
+    }
+
+    private AddressResponse getAddressResponse(String userId, AddressRequest request, UserAddress address) {
         address.setLabel(request.getLabel());
         address.setAddressLine(request.getFullAddress());
         address.setWard(request.getWardName());
@@ -88,18 +92,7 @@ public class UserService {
         UserAddress address = userAddressRepository.findById(addressId)
                 .orElseThrow(() -> new AppException(ErrorCode.ADDRESS_NOT_FOUND));
         if (!address.getUserId().equals(userId)) throw new AppException(ErrorCode.UNAUTHORIZED);
-        address.setLabel(request.getLabel());
-        address.setAddressLine(request.getFullAddress());
-        address.setWard(request.getWardName());
-        address.setDistrictId(request.getDistrictName());
-        address.setCityId(request.getCityName());
-        address.setLatitude(request.getLatitude());
-        address.setLongitude(request.getLongitude());
-        address.setDeliveryNote(request.getNote());
-        address.setIsDefault(request.isDefault());
-        if (request.isDefault()) unsetOtherDefaults(userId);
-        address = userAddressRepository.save(address);
-        return mapToAddressResponse(address);
+        return getAddressResponse(userId, request, address);
     }
 
     @Transactional

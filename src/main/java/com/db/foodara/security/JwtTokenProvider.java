@@ -24,8 +24,7 @@ public class JwtTokenProvider {
     private long refreshTokenExpirationMs;
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
     public String generateAccessToken(String userId, String email, List<String> roles) {
