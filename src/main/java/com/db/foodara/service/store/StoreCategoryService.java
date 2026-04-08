@@ -4,10 +4,14 @@ import com.db.foodara.dto.request.store.StoreCategoryCreateDto;
 import com.db.foodara.dto.request.store.StoreCategoryUpdateDto;
 import com.db.foodara.entity.store.StoreCategory;
 import com.db.foodara.repository.store.StoreCategoryRepository;
+import com.db.foodara.dto.response.store.StoreCategoryResponse;
+import com.db.foodara.exception.AppException;
+import com.db.foodara.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.stream.Collectors;
 import java.util.List;
 
 @Service
@@ -15,9 +19,9 @@ public class StoreCategoryService {
     @Autowired
     private StoreCategoryRepository storeCategoryRepository;
 
-    public StoreCategory createStoreCategory(StoreCategoryCreateDto request) {
+    public StoreCategoryResponse createStoreCategory(StoreCategoryCreateDto request) {
         if (storeCategoryRepository.existsByName(request.getName())) {
-            throw new RuntimeException("Store category existed");
+            throw new AppException(ErrorCode.STORE_CATEGORY_EXISTED);
         }
 
         StoreCategory storeCategory = new StoreCategory();
@@ -28,26 +32,31 @@ public class StoreCategoryService {
         storeCategory.setActive(request.getIsActive() == null || request.getIsActive());
         storeCategory.setCreatedAt(LocalDateTime.now());
 
-        return storeCategoryRepository.save(storeCategory);
+
+        StoreCategory saved = storeCategoryRepository.save(storeCategory);
+        return mapToResponse(saved);
     }
 
-    public List<StoreCategory> getStoreCategory() {
-        return storeCategoryRepository.findAll();
+    public List<StoreCategoryResponse> getStoreCategory() {
+        return storeCategoryRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
-    public StoreCategory getStoreCategory(String storeCategoryId) {
-        return storeCategoryRepository.findById(storeCategoryId)
-                .orElseThrow(() -> new RuntimeException("Store category not found"));
-    }
-
-    public StoreCategory updateStoreCategory(String storeCategoryId, StoreCategoryUpdateDto request) {
+    public StoreCategoryResponse getStoreCategory(String storeCategoryId) {
         StoreCategory storeCategory = storeCategoryRepository.findById(storeCategoryId)
-                .orElseThrow(() -> new RuntimeException("Store category not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_CATEGORY_NOT_FOUND));
+        return mapToResponse(storeCategory);
+    }
+
+    public StoreCategoryResponse updateStoreCategory(String storeCategoryId, StoreCategoryUpdateDto request) {
+        StoreCategory storeCategory = storeCategoryRepository.findById(storeCategoryId)
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_CATEGORY_NOT_FOUND));
 
         if (request.getName() != null
                 && !request.getName().equals(storeCategory.getName())
                 && storeCategoryRepository.existsByName(request.getName())) {
-            throw new RuntimeException("Store category existed");
+            throw new AppException(ErrorCode.STORE_CATEGORY_EXISTED);
         }
 
         storeCategory.setName(request.getName());
@@ -56,10 +65,23 @@ public class StoreCategoryService {
         storeCategory.setDisplayOrder(request.getDisplayOrder());
         storeCategory.setActive(request.getIsActive());
 
-        return storeCategoryRepository.save(storeCategory);
+        StoreCategory updated = storeCategoryRepository.save(storeCategory);
+        return mapToResponse(updated);
     }
 
     public void deleteStoreCategory(String storeCategoryId) {
         storeCategoryRepository.deleteById(storeCategoryId);
+    }
+
+    private StoreCategoryResponse mapToResponse(StoreCategory c) {
+        return StoreCategoryResponse.builder()
+                .id(c.getId())
+                .name(c.getName())
+                .slug(c.getSlug())
+                .iconUrl(c.getIconUrl())
+                .displayOrder(c.getDisplayOrder())
+                .isActive(c.isActive())
+                .createdAt(c.getCreatedAt())
+                .build();
     }
 }

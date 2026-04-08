@@ -1,5 +1,6 @@
 package com.db.foodara.controller;
 
+import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.request.ExampleCreationRequest;
 import com.db.foodara.dto.request.ExampleUpdateRequest;
 import com.db.foodara.entity.Example;
@@ -11,14 +12,17 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/example")
 public class ExampleController {
     @Autowired
     private ExampleService exampleService;
 
     @PostMapping
-    Example createUser(@RequestBody @Valid ExampleCreationRequest request) {
-        return exampleService.createUser(request);
+    ApiResponse<Example> createUser(@RequestBody @Valid ExampleCreationRequest request) {
+        ApiResponse<Example> apiResponse = new ApiResponse<>();
+        apiResponse.setResult(exampleService.createUser(request));
+        return apiResponse;
+//        return exampleService.createUser(request);
     }
 
     @GetMapping()
@@ -40,6 +44,6 @@ public class ExampleController {
     @DeleteMapping("/{userId}")
     String deleteUser(@PathVariable String userId) {
         exampleService.deleteUser(userId);
-        return "User has ben deleted";
+        return "user has ben deleted";
     }
 }
