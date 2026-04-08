@@ -1,6 +1,6 @@
 package com.db.foodara.exception;
 
-import com.db.foodara.dto.reponse.ApiResponse;
+import com.db.foodara.dto.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -37,6 +37,7 @@ public class GlobalExceptionHandler {
 
         try {
             errorCode = ErrorCode.valueOf(enumKey);
+            System.out.println(enumKey);
         } catch (IllegalArgumentException e) {
             //
         }

@@ -1,4 +1,4 @@
-package com.db.foodara.dto.reponse.user;
+package com.db.foodara.dto.response.user;
 
 import lombok.*;
 
@@ -17,5 +17,6 @@ public class UserProfileResponse {
     private String avatarUrl;
     private String status;
     private boolean emailVerified;
+    private boolean phoneVerified;
     private LocalDateTime createdAt;
 }

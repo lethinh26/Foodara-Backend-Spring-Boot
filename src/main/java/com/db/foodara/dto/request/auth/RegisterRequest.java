@@ -19,8 +19,11 @@ public class RegisterRequest {
     private String password;
 
     @NotBlank(message = "Full name is required")
+    @Size(min=4, message = "USERNAME_INVALID")
     private String fullName;
 
     @Pattern(regexp = "^0[0-9]{9}$", message = "INVALID_PHONE")
     private String phone;
+
+    private String avatarUrl;
 }

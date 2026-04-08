@@ -1,7 +1,8 @@
 package com.db.foodara.service.auth;
 
-import com.db.foodara.dto.reponse.auth.SessionResponse;
-import com.db.foodara.dto.reponse.auth.TokenResponse;
+import com.db.foodara.dto.response.auth.IpLocationResponse;
+import com.db.foodara.dto.response.auth.SessionResponse;
+import com.db.foodara.dto.response.auth.TokenResponse;
 import com.db.foodara.dto.request.auth.*;
 import com.db.foodara.entity.role.Role;
 import com.db.foodara.entity.user.User;
@@ -15,6 +16,7 @@ import com.db.foodara.repository.user.UserRoleRepository;
 import com.db.foodara.repository.user.UserSessionRepository;
 import com.db.foodara.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -35,6 +38,8 @@ public class AuthService {
     private final UserSessionRepository userSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final IpLocationService ipLocationService;
+    private final UserAgentParser userAgentParser;
 
     @Value("${app.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -45,12 +50,18 @@ public class AuthService {
             throw new AppException(ErrorCode.PHONE_EXISTS);
         }
 
+        if (request.getEmail() != null && userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_EXISTS);
+        }
+
         User user = new User();
         user.setEmail(request.getEmail());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName());
         user.setPhone(request.getPhone());
         user.setStatus("active");
+        user.setAvatarUrl(request.getAvatarUrl());
+
         user = userRepository.save(user);
 
         var customerRole = roleRepository.findByName("CUSTOMER").orElse(null);
@@ -61,7 +72,7 @@ public class AuthService {
             userRoleRepository.save(userRole);
         }
 
-        List<String> roles = List.of("CUSTOMER");
+        List<String> roles = getUserRoles(user.getId());
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), roles);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
@@ -69,10 +80,10 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenResponse login(LoginRequest request) {
+    public TokenResponse login(LoginRequest request, String ipAddress, String userAgent) {
         User user = userRepository.findByEmail(request.getUsername())
-                .or(() -> userRepository.findByPhone(request.getUsername()))
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_LOGIN));
+                .orElseGet(() -> userRepository.findByPhone(request.getUsername())
+                        .orElseThrow(() -> new AppException(ErrorCode.INVALID_LOGIN)));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new AppException(ErrorCode.WRONG_PASSWORD);
@@ -88,12 +99,30 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), roles);
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
-        // ss
+        IpLocationResponse locationInfo = ipLocationService.getLocationByIp(ipAddress);
+        
+        String browser = userAgentParser.extractBrowser(userAgent);
+        String os = userAgentParser.extractOS(userAgent);
+
         UserSession session = new UserSession();
         session.setUserId(user.getId());
         session.setTokenHash(refreshToken);
+        session.setIpAddress(ipAddress);
+        session.setUserAgent(userAgent);
+        session.setBrowser(browser);
+        session.setOs(os);
+        session.setCountry(locationInfo.getCountry());
+        session.setCity(locationInfo.getCity());
+        session.setRegion(locationInfo.getRegionName());
+        session.setTimezone(locationInfo.getTimezone());
+        session.setIsp(locationInfo.getIsp());
+        session.setLastActiveAt(LocalDateTime.now());
         session.setExpiresAt(LocalDateTime.now().plusDays(30));
+        
         userSessionRepository.save(session);
+
+        log.info("User logged in: userId={}, ip={}, browser={}, os={}, location={}, {}", 
+            user.getId(), ipAddress, browser, os, locationInfo.getCity(), locationInfo.getCountry());
 
         return TokenResponse.of(accessToken, refreshToken, accessTokenExpirationMs);
     }
@@ -151,13 +180,21 @@ public class AuthService {
 
     public List<SessionResponse> getSessions(String userId) {
         return userSessionRepository.findByUserId(userId).stream()
-                .map(session -> SessionResponse.builder()
-                        .id(session.getId())
-                        .deviceName(session.getDeviceId())
-                        .ipAddress(session.getIpAddress())
-                        .lastActiveAt(session.getCreatedAt())
-                        .createdAt(session.getCreatedAt())
-                        .build())
+                .map(session -> {
+                    SessionResponse response = SessionResponse.builder()
+                            .id(session.getId())
+                            .deviceName(session.getBrowser() + " on " + session.getOs())
+                            .browser(session.getBrowser())
+                            .os(session.getOs())
+                            .ipAddress(session.getIpAddress())
+                            .country(session.getCountry())
+                            .city(session.getCity())
+                            .lastActiveAt(session.getLastActiveAt() != null ? session.getLastActiveAt() : session.getCreatedAt())
+                            .createdAt(session.getCreatedAt())
+                            .current(false)
+                            .build();
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 

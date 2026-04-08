@@ -1,19 +1,18 @@
 package com.db.foodara.service.user;
 
-import com.db.foodara.dto.reponse.user.AddressResponse;
-import com.db.foodara.dto.reponse.user.DeviceResponse;
-import com.db.foodara.dto.reponse.user.UserProfileResponse;
+import com.db.foodara.dto.response.user.AddressResponse;
+import com.db.foodara.dto.response.user.UserProfileResponse;
 import com.db.foodara.dto.request.user.AddressRequest;
-import com.db.foodara.dto.request.user.DeviceRequest;
 import com.db.foodara.dto.request.user.UpdateProfileRequest;
+
 import com.db.foodara.entity.user.User;
 import com.db.foodara.entity.user.UserAddress;
-import com.db.foodara.entity.user.UserDevice;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
+import com.db.foodara.repository.location.CityRepository;
+import com.db.foodara.repository.location.DistrictRepository;
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
-import com.db.foodara.repository.user.UserDeviceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,8 +26,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserAddressRepository userAddressRepository;
-    private final UserDeviceRepository userDeviceRepository;
+    private final CityRepository cityRepository;
+    private final DistrictRepository districtRepository;
 
+    // ============================================================
+    // Profile
+    // ============================================================
     public UserProfileResponse getProfile(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -59,6 +62,9 @@ public class UserService {
         return mapToProfileResponse(user);
     }
 
+    // ============================================================
+    // Addresses
+    // ============================================================
     public List<AddressResponse> getAddresses(String userId) {
         return userAddressRepository.findByUserIdOrderByIsDefaultDesc(userId).stream()
                 .map(this::mapToAddressResponse)
@@ -69,22 +75,7 @@ public class UserService {
     public AddressResponse createAddress(String userId, AddressRequest request) {
         UserAddress address = new UserAddress();
         address.setUserId(userId);
-        return getAddressResponse(userId, request, address);
-    }
-
-    private AddressResponse getAddressResponse(String userId, AddressRequest request, UserAddress address) {
-        address.setLabel(request.getLabel());
-        address.setAddressLine(request.getFullAddress());
-        address.setWard(request.getWardName());
-        address.setDistrictId(request.getDistrictName());
-        address.setCityId(request.getCityName());
-        address.setLatitude(request.getLatitude());
-        address.setLongitude(request.getLongitude());
-        address.setDeliveryNote(request.getNote());
-        address.setIsDefault(request.isDefault());
-        if (request.isDefault()) unsetOtherDefaults(userId);
-        address = userAddressRepository.save(address);
-        return mapToAddressResponse(address);
+        return saveAddress(userId, request, address);
     }
 
     @Transactional
@@ -92,7 +83,7 @@ public class UserService {
         UserAddress address = userAddressRepository.findById(addressId)
                 .orElseThrow(() -> new AppException(ErrorCode.ADDRESS_NOT_FOUND));
         if (!address.getUserId().equals(userId)) throw new AppException(ErrorCode.UNAUTHORIZED);
-        return getAddressResponse(userId, request, address);
+        return saveAddress(userId, request, address);
     }
 
     @Transactional
@@ -114,30 +105,30 @@ public class UserService {
         return mapToAddressResponse(address);
     }
 
-    public List<DeviceResponse> getDevices(String userId) {
-        return userDeviceRepository.findByUserId(userId).stream()
-                .map(this::mapToDeviceResponse)
-                .collect(Collectors.toList());
-    }
+    // ============================================================
+    // Private helpers
+    // ============================================================
+    private AddressResponse saveAddress(String userId, AddressRequest request, UserAddress address) {
+        address.setLabel(request.getLabel());
+        address.setRecipientName(request.getRecipientName());
+        address.setRecipientPhone(request.getRecipientPhone());
+        address.setAddressLine(request.getAddressLine());
+        address.setWard(request.getWard());
+        address.setDistrictCode(request.getDistrictId());
+        address.setDistrictName(request.getDistrictName());
+        address.setCityCode(request.getCityId());
+        address.setCityName(request.getCityName());
+        address.setLatitude(request.getLatitude());
+        address.setLongitude(request.getLongitude());
+        address.setDeliveryNote(request.getDeliveryNote());
+        address.setIsDefault(request.isDefault());
 
-    @Transactional
-    public DeviceResponse registerDevice(String userId, DeviceRequest request) {
-        UserDevice device = userDeviceRepository.findByUserIdAndDeviceToken(userId, request.getDeviceToken())
-                .orElse(new UserDevice());
-        device.setUserId(userId);
-        device.setDeviceToken(request.getDeviceToken());
-        device.setDeviceName(request.getDeviceName());
-        device.setDeviceType(request.getDeviceType());
-        device = userDeviceRepository.save(device);
-        return mapToDeviceResponse(device);
-    }
+        if (request.isDefault()) {
+            unsetOtherDefaults(userId);
+        }
 
-    @Transactional
-    public void deleteDevice(String userId, String deviceId) {
-        UserDevice device = userDeviceRepository.findById(deviceId)
-                .orElseThrow(() -> new AppException(ErrorCode.DEVICE_NOT_FOUND));
-        if (!device.getUserId().equals(userId)) throw new AppException(ErrorCode.UNAUTHORIZED);
-        userDeviceRepository.delete(device);
+        address = userAddressRepository.save(address);
+        return mapToAddressResponse(address);
     }
 
     private void unsetOtherDefaults(String userId) {
@@ -148,30 +139,36 @@ public class UserService {
 
     private UserProfileResponse mapToProfileResponse(User user) {
         return UserProfileResponse.builder()
-                .id(user.getId()).email(user.getEmail()).fullName(user.getFullName())
-                .phone(user.getPhone()).avatarUrl(user.getAvatarUrl()).status(user.getStatus())
-                .emailVerified(user.getEmailVerifiedAt() != null).createdAt(user.getCreatedAt())
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .status(user.getStatus())
+                .emailVerified(user.getEmailVerifiedAt() != null)
+                .phoneVerified(user.getPhoneVerifiedAt() != null)
+                .createdAt(user.getCreatedAt())
                 .build();
     }
 
     private AddressResponse mapToAddressResponse(UserAddress a) {
-        return AddressResponse.builder()
-                .id(a.getId()).label(a.getLabel())
-                .fullAddress(a.getAddressLine())
-                .wardName(a.getWard())
-                .districtName(a.getDistrictId())
-                .cityName(a.getCityId())
-                .latitude(a.getLatitude()).longitude(a.getLongitude())
-                .note(a.getDeliveryNote())
-                .isDefault(Boolean.TRUE.equals(a.getIsDefault()))
-                .build();
-    }
 
-    private DeviceResponse mapToDeviceResponse(UserDevice device) {
-        return DeviceResponse.builder()
-                .id(device.getId()).deviceToken(device.getDeviceToken())
-                .deviceName(device.getDeviceName()).deviceType(device.getDeviceType())
-                .createdAt(device.getCreatedAt())
+        return AddressResponse.builder()
+                .id(a.getId())
+                .label(a.getLabel())
+                .recipientName(a.getRecipientName())
+                .recipientPhone(a.getRecipientPhone())
+                .addressLine(a.getAddressLine())
+                .ward(a.getWard())
+                .districtId(a.getDistrictCode())
+                .districtName(a.getDistrictName())
+                .cityId(a.getCityCode())
+                .cityName(a.getCityName())
+                .latitude(a.getLatitude())
+                .longitude(a.getLongitude())
+                .deliveryNote(a.getDeliveryNote())
+                .isDefault(Boolean.TRUE.equals(a.getIsDefault()))
+                .createdAt(a.getCreatedAt())
                 .build();
     }
 }

@@ -29,7 +29,7 @@ public class User {
     private String passwordHash;
 
     @Column(name = "full_name", length = 255)
-    @Size(min = 8, message = "USERNAME_INVALID")
+    @Size(min = 4, message = "USERNAME_INVALID")
     private String fullName;
 
     @Column(length = 20)
@@ -47,6 +47,9 @@ public class User {
 
     @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
+
+    @Column(name = "phone_verified_at")
+    private LocalDateTime phoneVerifiedAt;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;

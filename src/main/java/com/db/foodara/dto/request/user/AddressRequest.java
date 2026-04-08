@@ -12,14 +12,19 @@ public class AddressRequest {
     @NotBlank(message = "Label is required")
     private String label;
 
-    @NotBlank(message = "Full address is required")
-    private String fullAddress;
+    private String recipientName;
+    private String recipientPhone;
 
-    private String wardName;
+    @NotBlank(message = "Full address is required")
+    private String addressLine;
+
+    private String ward;
+    private String districtId;
     private String districtName;
+    private String cityId;
     private String cityName;
     private BigDecimal latitude;
     private BigDecimal longitude;
-    private String note;
+    private String deliveryNote;
     private boolean isDefault;
 }

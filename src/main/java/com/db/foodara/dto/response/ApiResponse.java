@@ -1,4 +1,4 @@
-package com.db.foodara.dto.reponse;
+package com.db.foodara.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 

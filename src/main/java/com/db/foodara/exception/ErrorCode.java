@@ -19,7 +19,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(1201, "User not found"),
     EMAIL_EXISTS(1202, "Email already exists"),
     PHONE_EXISTS(1203, "Phone already exists"),
-    USERNAME_INVALID(1204, "Username must be at least 3 characters"),
+    USERNAME_INVALID(1204, "Username must be at least 8 characters"),
     PASSWORD_INVALID(1205, "Password must be at least 8 characters"),
     EMAIL_INVALID(1206, "Email isn't valid"),
     PHONE_INVALID(1207, "Phone isn't valid"),
@@ -30,7 +30,19 @@ public enum ErrorCode {
     ADDRESS_NOT_FOUND(1300, "Address not found"),
 
     SESSION_NOT_FOUND(1400, "Session not found"),
-    DEVICE_NOT_FOUND(1401, "Device not found"),
+
+    // Location
+    CITY_NOT_FOUND(1500, "City not found"),
+    DISTRICT_NOT_FOUND(1501, "District not found"),
+    SERVICE_ZONE_NOT_FOUND(1502, "Service zone not found"),
+    LOCATION_NOT_COVERED(1503, "Location is not within service coverage"),
+    GEOCODING_FAILED(1504, "Geocoding failed"),
+    INVALID_COORDINATES(1505, "Invalid latitude or longitude"),
+    DISTRICT_NOT_IN_CITY(1506, "District does not belong to specified city"),
+
+    // Store & Categories
+    STORE_CATEGORY_EXISTED(1600, "Store category already existed"),
+    STORE_CATEGORY_NOT_FOUND(1601, "Store category not found"),
             ;
     private int code;
     private String message;

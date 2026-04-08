@@ -1,5 +1,6 @@
 package com.db.foodara.entity.user;
 
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -34,11 +35,17 @@ public class UserAddress {
     @Column(length = 100)
     private String ward;
 
-    @Column(name = "district_id")
-    private String districtId;
+    @Column(name = "district_code")
+    private String districtCode;
+    
+    @Column(name = "district_name", length = 100)
+    private String districtName;
 
-    @Column(name = "city_id")
-    private String cityId;
+    @Column(name = "city_code")
+    private String cityCode;
+    
+    @Column(name = "city_name", length = 100)
+    private String cityName;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;

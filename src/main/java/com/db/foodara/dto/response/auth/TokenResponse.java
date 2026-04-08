@@ -1,4 +1,4 @@
-package com.db.foodara.dto.reponse.auth;
+package com.db.foodara.dto.response.auth;
 
 import lombok.*;
 
