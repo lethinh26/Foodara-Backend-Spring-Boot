@@ -42,7 +42,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // Public auth endpoints (paths relative to context-path /api)
-                        .requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh-token").permitAll()
+                        .requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh-token", "/v1/merchant/**").permitAll()
                         .requestMatchers("/v1/auth/verify-email", "/v1/auth/forgot-password", "/v1/auth/reset-password").permitAll()
                         // Public read endpoints
                         .requestMatchers(HttpMethod.GET, "/home/**", "/search/**", "/stores/**", "/menu-items/**", "/locations/**").permitAll()
