@@ -47,16 +47,16 @@ public class AuthController {
     // POST /api/auth/login
     @PostMapping("/login")
     public ApiResponse<TokenResponse> login(
-            @RequestBody @Valid LoginRequest request, 
+            @RequestBody @Valid LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse response) {
-        
+
         String xForwardedFor = httpRequest.getHeader("X-Forwarded-For");
         String remoteAddr = httpRequest.getRemoteAddr();
         String ipAddress = ipLocationService.extractIpFromRequest(xForwardedFor, remoteAddr);
-        
+
         String userAgent = httpRequest.getHeader("User-Agent");
-        
+
         TokenResponse tokenResponse = authService.login(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
         return ApiResponse.success("Login successful",
@@ -87,9 +87,9 @@ public class AuthController {
         RefreshTokenRequest request = new RefreshTokenRequest();
         request.setRefreshToken(refreshToken);
         TokenResponse tokenResponse = authService.refreshToken(request);
-        
+
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
-        
+
         return ApiResponse.success(
             TokenResponse.builder()
                 .accessToken(tokenResponse.getAccessToken())
@@ -124,9 +124,10 @@ public class AuthController {
     public ApiResponse<List<SessionResponse>> getSessions(
             Authentication authentication,
             @CookieValue(value = "refreshToken", required = false) String refreshToken) {
-        
-        List<SessionResponse> sessions = authService.getSessions(authentication.getName());
-        
+
+        String userId = authentication.getName();
+        List<SessionResponse> sessions = authService.getSessions(userId);
+
         // Mark current session if refresh token matches
         if (refreshToken != null && !refreshToken.isEmpty()) {
             sessions.forEach(session -> {
@@ -138,14 +139,15 @@ public class AuthController {
                 sessions.get(0).setCurrent(true);
             }
         }
-        
+
         return ApiResponse.success(sessions);
     }
 
     // DELETE /api/auth/sessions/{id}
     @DeleteMapping("/sessions/{id}")
     public ApiResponse<Void> deleteSession(Authentication authentication, @PathVariable String id) {
-        authService.deleteSession(authentication.getName(), id);
+        String userId = authentication.getName();
+        authService.deleteSession(userId, id);
         return ApiResponse.success("Session deleted");
     }
 

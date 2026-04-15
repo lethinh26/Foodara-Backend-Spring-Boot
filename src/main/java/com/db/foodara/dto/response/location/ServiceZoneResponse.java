@@ -3,6 +3,7 @@ package com.db.foodara.dto.response.location;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -10,9 +11,9 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ServiceZoneResponse {
-    private String id;
+    private UUID id;
     private String name;
-    private String cityId;
+    private UUID cityId;
     private boolean isActive;
     private BigDecimal surgeMultiplier;
 }

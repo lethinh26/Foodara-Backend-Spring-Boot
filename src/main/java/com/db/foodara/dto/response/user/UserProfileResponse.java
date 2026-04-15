@@ -17,6 +17,5 @@ public class UserProfileResponse {
     private String avatarUrl;
     private String status;
     private boolean emailVerified;
-    private boolean phoneVerified;
     private LocalDateTime createdAt;
 }

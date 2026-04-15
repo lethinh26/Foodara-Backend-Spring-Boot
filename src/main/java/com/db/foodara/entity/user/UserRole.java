@@ -3,6 +3,7 @@ import com.db.foodara.entity.role.Role;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+
 import java.time.LocalDateTime;
 
 @Getter
@@ -14,10 +15,10 @@ public class UserRole {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private String userId;
 
-    @Column(name = "role_id", nullable = false)
+    @Column(name = "role_id")
     private String roleId;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -43,7 +43,14 @@ public enum ErrorCode {
     // Store & Categories
     STORE_CATEGORY_EXISTED(1600, "Store category already existed"),
     STORE_CATEGORY_NOT_FOUND(1601, "Store category not found"),
-            ;
+    STORE_NOT_FOUND(1602, "Store not found"),
+
+    // Merchant
+    MERCHANT_NOT_FOUND(1700, "Merchant not found"),
+    MERCHANT_ALREADY_EXISTS(1701, "Merchant already exists for this user"),
+    MERCHANT_DOCUMENT_NOT_FOUND(1702, "Document not found"),
+    MERCHANT_BANK_ACCOUNT_NOT_FOUND(1703, "Bank account not found"),
+    ;
     private int code;
     private String message;
 
