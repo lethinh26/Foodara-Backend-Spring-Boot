@@ -68,19 +68,22 @@ public class LocationService {
         List<ServiceZone> activeZones = serviceZoneRepository.findByIsActiveTrue();
 
         for (ServiceZone zone : activeZones) {
-            if (zone.getBoundaryGeojson() != null && !zone.getBoundaryGeojson().isBlank()) {
-                if (isPointInZone(latitude.doubleValue(), longitude.doubleValue(), zone.getBoundaryGeojson())) {
-                    City city = zone.getCityId() != null
-                            ? cityRepository.findById(zone.getCityId()).orElse(null)
-                            : null;
-                    return CoverageCheckResponse.builder()
-                            .covered(true)
-                            .zoneId(zone.getId())
-                            .zoneName(zone.getName())
-                            .cityId(zone.getCityId())
-                            .cityName(city != null ? city.getName() : null)
-                            .surgeMultiplier(zone.getSurgeMultiplier())
-                            .build();
+            if (zone.getBoundaryGeojson() != null) {
+                String geojsonStr = zone.getBoundaryGeojson().toString();
+                if (!geojsonStr.isBlank()) {
+                    if (isPointInZone(latitude.doubleValue(), longitude.doubleValue(), geojsonStr)) {
+                        City city = zone.getCityId() != null
+                                ? cityRepository.findById(zone.getCityId()).orElse(null)
+                                : null;
+                        return CoverageCheckResponse.builder()
+                                .covered(true)
+                                .zoneId(zone.getId())
+                                .zoneName(zone.getName())
+                                .cityId(zone.getCityId())
+                                .cityName(city != null ? city.getName() : null)
+                                .surgeMultiplier(zone.getSurgeMultiplier())
+                                .build();
+                    }
                 }
             }
         }

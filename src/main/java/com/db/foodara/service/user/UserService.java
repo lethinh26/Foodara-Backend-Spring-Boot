@@ -114,10 +114,8 @@ public class UserService {
         address.setRecipientPhone(request.getRecipientPhone());
         address.setAddressLine(request.getAddressLine());
         address.setWard(request.getWard());
-        address.setDistrictCode(request.getDistrictId());
-        address.setDistrictName(request.getDistrictName());
-        address.setCityCode(request.getCityId());
-        address.setCityName(request.getCityName());
+        address.setDistrictId(request.getDistrictId());
+        address.setCityId(request.getCityId());
         address.setLatitude(request.getLatitude());
         address.setLongitude(request.getLongitude());
         address.setDeliveryNote(request.getDeliveryNote());
@@ -146,7 +144,6 @@ public class UserService {
                 .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus())
                 .emailVerified(user.getEmailVerifiedAt() != null)
-                .phoneVerified(user.getPhoneVerifiedAt() != null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }
@@ -160,10 +157,8 @@ public class UserService {
                 .recipientPhone(a.getRecipientPhone())
                 .addressLine(a.getAddressLine())
                 .ward(a.getWard())
-                .districtId(a.getDistrictCode())
-                .districtName(a.getDistrictName())
-                .cityId(a.getCityCode())
-                .cityName(a.getCityName())
+                .districtId(a.getDistrictId())
+                .cityId(a.getCityId())
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
                 .deliveryNote(a.getDeliveryNote())

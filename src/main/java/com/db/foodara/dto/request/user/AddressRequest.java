@@ -20,9 +20,7 @@ public class AddressRequest {
 
     private String ward;
     private String districtId;
-    private String districtName;
     private String cityId;
-    private String cityName;
     private BigDecimal latitude;
     private BigDecimal longitude;
     private String deliveryNote;

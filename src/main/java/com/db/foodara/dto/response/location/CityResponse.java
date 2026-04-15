@@ -2,6 +2,8 @@ package com.db.foodara.dto.response.location;
 
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 @Builder

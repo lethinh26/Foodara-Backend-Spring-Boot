@@ -100,29 +100,18 @@ public class AuthService {
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
         IpLocationResponse locationInfo = ipLocationService.getLocationByIp(ipAddress);
-        
-        String browser = userAgentParser.extractBrowser(userAgent);
-        String os = userAgentParser.extractOS(userAgent);
 
         UserSession session = new UserSession();
         session.setUserId(user.getId());
         session.setTokenHash(refreshToken);
         session.setIpAddress(ipAddress);
         session.setUserAgent(userAgent);
-        session.setBrowser(browser);
-        session.setOs(os);
-        session.setCountry(locationInfo.getCountry());
-        session.setCity(locationInfo.getCity());
-        session.setRegion(locationInfo.getRegionName());
-        session.setTimezone(locationInfo.getTimezone());
-        session.setIsp(locationInfo.getIsp());
-        session.setLastActiveAt(LocalDateTime.now());
         session.setExpiresAt(LocalDateTime.now().plusDays(30));
-        
+
         userSessionRepository.save(session);
 
-        log.info("User logged in: userId={}, ip={}, browser={}, os={}, location={}, {}", 
-            user.getId(), ipAddress, browser, os, locationInfo.getCity(), locationInfo.getCountry());
+        log.info("User logged in: userId={}, ip={}, location={}, {}",
+            user.getId(), ipAddress, locationInfo.getCity(), locationInfo.getCountry());
 
         return TokenResponse.of(accessToken, refreshToken, accessTokenExpirationMs);
     }
@@ -154,7 +143,7 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        List<String> roles = getUserRoles(userId);
+        List<String> roles = getUserRoles(user.getId());
         String newAccessToken = jwtTokenProvider.generateAccessToken(userId, user.getEmail(), roles);
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(userId);
 
@@ -180,21 +169,12 @@ public class AuthService {
 
     public List<SessionResponse> getSessions(String userId) {
         return userSessionRepository.findByUserId(userId).stream()
-                .map(session -> {
-                    SessionResponse response = SessionResponse.builder()
-                            .id(session.getId())
-                            .deviceName(session.getBrowser() + " on " + session.getOs())
-                            .browser(session.getBrowser())
-                            .os(session.getOs())
-                            .ipAddress(session.getIpAddress())
-                            .country(session.getCountry())
-                            .city(session.getCity())
-                            .lastActiveAt(session.getLastActiveAt() != null ? session.getLastActiveAt() : session.getCreatedAt())
-                            .createdAt(session.getCreatedAt())
-                            .current(false)
-                            .build();
-                    return response;
-                })
+                .map(session -> SessionResponse.builder()
+                        .id(session.getId())
+                        .ipAddress(session.getIpAddress())
+                        .createdAt(session.getCreatedAt())
+                        .current(false)
+                        .build())
                 .collect(Collectors.toList());
     }
 
