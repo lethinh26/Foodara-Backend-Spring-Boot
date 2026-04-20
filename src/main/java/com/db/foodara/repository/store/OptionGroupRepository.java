@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface OptionGroupRepository extends JpaRepository<OptionGroup, String> {
     List<OptionGroup> findByStoreIdOrderByDisplayOrder(String storeId);
+
+    String id(String id);
 }

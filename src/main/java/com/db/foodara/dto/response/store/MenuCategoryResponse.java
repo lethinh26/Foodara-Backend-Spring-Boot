@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MenuCategoryResponse {
-
     private String id;
     private String storeId;
     private String name;
