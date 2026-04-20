@@ -42,7 +42,8 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh-token").permitAll()
+                        // Public auth endpoints (paths relative to context-path /api)
+                        .requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh-token", "/v1/merchant/**").permitAll()
                         .requestMatchers("/v1/auth/verify-email", "/v1/auth/forgot-password", "/v1/auth/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/home/**", "/v1/search/**", "/v1/stores/**", "/v1/menu-items/**", "/v1/locations/**", "/v1/store-categories/**").permitAll()
                         .requestMatchers("/v1/merchant/login", "/v1/merchant/register").permitAll()
