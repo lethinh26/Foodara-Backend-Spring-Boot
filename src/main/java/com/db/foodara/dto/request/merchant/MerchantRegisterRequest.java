@@ -1,8 +1,7 @@
 package com.db.foodara.dto.request.merchant;
 
-
-import com.db.foodara.exception.ErrorCode;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,21 +9,20 @@ import lombok.Setter;
 @Getter
 @Setter
 public class MerchantRegisterRequest {
-    @Size(min = 6,  message = "MERCHANT_NAME_INVALID")
+    @NotBlank(message = "Business name is required")
+    @Size(min = 2, max = 255, message = "Business name must be between 2 and 255 characters")
     private String name;
-    private String ownerId;
-    @Size(min = 10, max = 13, message = "TAX_CODE_INVALID")
+
+    @Size(max = 50, message = "Tax code must not exceed 50 characters")
     private String taxCode;
-    @Pattern(
-            regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}$",
-            message = "MERCHANT_EMAIL_INVALID"
-    )
+
+    @Email(message = "Invalid email format")
+    @Size(max = 255, message = "Email must not exceed 255 characters")
     private String businessEmail;
-    @Pattern(
-            regexp = "0[0-9]{9}",
-            message = "MERCHANT_PHONE_INVALID"
-    )
+
+    @Size(max = 20, message = "Phone must not exceed 20 characters")
     private String businessPhone;
+
     private String logoUrl;
     private String coverImageUrl;
 }

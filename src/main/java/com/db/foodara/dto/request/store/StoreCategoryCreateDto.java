@@ -9,6 +9,7 @@ import lombok.Setter;
 public class StoreCategoryCreateDto {
     @Size(min = 3, message = "Name must be at least 3 character")
     private String name;
+
     private String slug;
     private String iconUrl;
     private Integer displayOrder;

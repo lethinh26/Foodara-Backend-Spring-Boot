@@ -29,7 +29,7 @@ public class User {
     private String passwordHash;
 
     @Column(name = "full_name", length = 255)
-    @Size(min = 8, message = "USERNAME_INVALID")
+    @Size(min = 4, message = "USERNAME_INVALID")
     private String fullName;
 
     @Column(length = 20)

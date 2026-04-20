@@ -1,120 +1,133 @@
 package com.db.foodara.controller.merchant;
 
-import com.db.foodara.dto.reponse.ApiResponse;
-import com.db.foodara.dto.reponse.auth.TokenResponse;
-import com.db.foodara.dto.reponse.merchant.MerchantProfileResponse;
-import com.db.foodara.dto.request.auth.RegisterRequest;
-import com.db.foodara.dto.request.merchant.MerchantRegisterRequest;
-import com.db.foodara.dto.request.merchant.MerchantUpdateProfileRequest;
-import com.db.foodara.dto.request.merchant.bankaccount.BankAccountCreateRequest;
-import com.db.foodara.dto.request.merchant.bankaccount.BankAccountUpdateRequest;
-import com.db.foodara.dto.request.merchant.document.DocumentRequest;
-import com.db.foodara.dto.request.store.StoreAddressRequest;
-import com.db.foodara.dto.request.store.StoreCreateRequest;
-import com.db.foodara.dto.request.store.StoreOperationRequest;
-import com.db.foodara.dto.request.store.StoreStatusRequest;
-import com.db.foodara.entity.merchant.Merchant;
-import com.db.foodara.entity.merchant.bankaccount.BankAccount;
-import com.db.foodara.entity.merchant.document.Document;
-import com.db.foodara.entity.merchant.store.Store;
-import com.db.foodara.repository.merchant.MerchantRepository;
+import com.db.foodara.dto.request.merchant.*;
+import com.db.foodara.dto.response.merchant.BankAccountResponse;
+import com.db.foodara.dto.response.merchant.MerchantDocumentResponse;
+import com.db.foodara.dto.response.merchant.MerchantProfileResponse;
+import com.db.foodara.dto.response.store.StoreResponse;
+import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.service.merchant.MerchantService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.parameters.P;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/v1/merchant")
-@RequiredArgsConstructor
 public class MerchantController {
-    private final MerchantService merchantService;
 
-    // 83 post	/api/merchant/register
+    @Autowired
+    private MerchantService merchantService;
+
     @PostMapping("/register")
-    public ApiResponse<Merchant> registerMerchant(@RequestBody @Valid MerchantRegisterRequest request) {
-        return ApiResponse.success("Register merchant successful", merchantService.registerMerchant(request));
+    public ApiResponse<MerchantProfileResponse> registerMerchant(Authentication authentication,
+                                                                   @RequestBody @Valid MerchantRegisterRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.registerMerchant(userId, request));
     }
 
-    // 84	GET 	/api/merchant/profile	/api/merchant/profile
-    @GetMapping("/profile/{merchantId}")
-    public ApiResponse<MerchantProfileResponse> merchantProfile(@PathVariable String merchantId) {
-        return ApiResponse.success("Get merchant profile successful", merchantService.getMerchantProfile(merchantId));
+    @GetMapping("/profile")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<MerchantProfileResponse> getProfile(Authentication authentication) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.getProfile(userId));
     }
 
-    // 85	PUT	/api/merchant/profile
-    @PutMapping("/profile/{merchantId}")
-    public ApiResponse<MerchantProfileResponse> postMerchantProfile(@PathVariable String merchantId,@RequestBody @Valid MerchantUpdateProfileRequest request){
-        return ApiResponse.success("Update merchant profile successful", merchantService.updateProfile(merchantId, request));
+    @PutMapping("/profile")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<MerchantProfileResponse> updateProfile(Authentication authentication,
+                                                               @RequestBody MerchantProfileRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.updateProfile(userId, request));
     }
 
-    // 86	POST	/api/merchant/documents
-    @PostMapping("/documents/{merchantId}")
-    public ApiResponse<Document> uploadDocument(@PathVariable String merchantId, @RequestBody DocumentRequest request){
-        return ApiResponse.success("Upload document successful", merchantService.uploadDocument(merchantId, request));
+    @PostMapping("/documents")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<MerchantDocumentResponse> uploadDocument(Authentication authentication,
+                                                                 @RequestBody @Valid MerchantDocumentRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.uploadDocument(userId, request));
     }
 
-    // 87	GET	/api/merchant/documents
-    @GetMapping("/documents/{merchantId}")
-    public ApiResponse<List<Document>> getAllDocumentOfMerchant(@PathVariable String merchantId){
-        return ApiResponse.success("Get all document of merchant successful", merchantService.getAllDocumentOfMerchant(merchantId));
+    @GetMapping("/documents")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<List<MerchantDocumentResponse>> getDocuments(Authentication authentication) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.getDocuments(userId));
     }
 
-    // 88	GET	/api/merchant/stores
-    @GetMapping("/stores/{merchantId}")
-    public ApiResponse<List<Store>> getStoresOfMerchant(@PathVariable String merchantId){
-        return ApiResponse.success("Get stores of merchant successful", merchantService.getStoresOfMerchant(merchantId));
+    @GetMapping("/stores")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<List<StoreResponse>> getStores(Authentication authentication) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.getStores(userId));
     }
 
-    // 89 POST /api/merchant/stores
-    @PostMapping("/stores/{merchantId}")
-    public ApiResponse<Store> postStore(@PathVariable String merchantId,@RequestBody StoreCreateRequest request){
-        return ApiResponse.success("Register a store successful", merchantService.createStore(merchantId, request));
+    @PostMapping("/stores")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<StoreResponse> createStore(Authentication authentication,
+                                                   @RequestBody @Valid StoreCreateRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.createStore(userId, request));
     }
 
-    // 90 GET	/api/merchant/store/:id
-    @GetMapping("/store/{storeId}")
-    public ApiResponse<Store> getStoreDetail(@PathVariable String storeId){
-        return ApiResponse.success("Get store detail successful", merchantService.getStoreDetail(storeId));
+    @GetMapping("/stores/{id}")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<StoreResponse> getStore(Authentication authentication, @PathVariable String id) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.getStore(userId, id));
     }
 
-    // 91 PUT	/api/merchant/stores/:id
-    @PutMapping("/store-address/{storeId}")
-    public ApiResponse<Store> updateStore(@PathVariable String storeId, @RequestBody @Valid StoreAddressRequest request){
-        return ApiResponse.success("Update store address successful", merchantService.updateStoreAddress(storeId, request));
+    @PutMapping("/stores/{id}")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<StoreResponse> updateStore(Authentication authentication,
+                                                   @PathVariable String id,
+                                                   @RequestBody StoreUpdateRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.updateStore(userId, id, request));
     }
 
-    // 92 put /api/merchant/stores/:id/toggle
-    @PutMapping("/store-toggle/{storeId}")
-    public ApiResponse<Store> updateStoreToggle(@PathVariable String storeId, @RequestBody @Valid StoreStatusRequest request){
-        return ApiResponse.success("Update store toggle successful", merchantService.updateStatusStore(storeId, request));
+    @PutMapping("/stores/{id}/toggle")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<StoreResponse> toggleStore(Authentication authentication, @PathVariable String id) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.toggleStore(userId, id));
     }
 
-    // 93 	PUT	/api/merchant/stores/:id/operating-hours
-    @PutMapping("/store-operating/{storeId}")
-    public ApiResponse<Store> updateStoreOperating(@PathVariable String storeId, @RequestBody @Valid StoreOperationRequest request){
-        return ApiResponse.success("Update store operation successful", merchantService.updateOperationStore(storeId, request));
+    @PutMapping("/stores/{id}/operating-hours")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<Void> updateOperatingHours(Authentication authentication,
+                                                     @PathVariable String id,
+                                                     @RequestBody List<StoreOperatingHoursRequest> requests) {
+        String userId = authentication.getName();
+        merchantService.updateOperatingHours(userId, id, requests);
+        return ApiResponse.success("Operating hours updated");
     }
 
-    // 94	GET	/api/merchant/bank-accounts
-    @GetMapping("/bank-accounts/{merchantId}")
-    public ApiResponse<List<BankAccount>> getBankAccounts(@PathVariable String merchantId){
-        return ApiResponse.success("Get bank accounts successful", merchantService.getBankAccountOfMerchant(merchantId));
+https://github.com/lethinh26/Foodara-Backend-Spring-Boot/pull/10/conflict?name=src%252Fmain%252Fjava%252Fcom%252Fdb%252Ffoodara%252Fcontroller%252Fmerchant%252FMerchantController.java&base_oid=7185a5be423b49e8ac95dcb80f352d512f1e01a1&head_oid=7e8c54b9906d72be5a6b12f18cb7e4c37bfaeca5    @GetMapping("/bank-accounts")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<List<BankAccountResponse>> getBankAccounts(Authentication authentication) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.getBankAccounts(userId));
     }
 
-    // 95	POST	/api/merchant/bank-accounts
-    @PostMapping("/bank-account/{merchantId}/{storeId}")
-    public ApiResponse<BankAccount> postBankAccount(@PathVariable String merchantId, @PathVariable String storeId, @RequestBody @Valid BankAccountCreateRequest request){
-        return ApiResponse.success("Post a bank account successful", merchantService.createBankAccount(merchantId, storeId ,request));
+    @PostMapping("/bank-accounts")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<BankAccountResponse> addBankAccount(Authentication authentication,
+                                                             @RequestBody @Valid BankAccountRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.addBankAccount(userId, request));
     }
 
-    // 96	PUT	/api/merchant/bank-accounts/:id
-    @PutMapping("/bank-account/{bankAccountId}")
-    public ApiResponse<BankAccount> updateBankAccount(@PathVariable String bankAccountId, BankAccountUpdateRequest request){
-        return ApiResponse.success("Update bank account successful", merchantService.updateBankAccount(bankAccountId, request));
+    @PutMapping("/bank-accounts/{id}")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ApiResponse<BankAccountResponse> updateBankAccount(Authentication authentication,
+                                                                @PathVariable String id,
+                                                                @RequestBody BankAccountRequest request) {
+        String userId = authentication.getName();
+        return ApiResponse.success(merchantService.updateBankAccount(userId, id, request));
     }
-
 }

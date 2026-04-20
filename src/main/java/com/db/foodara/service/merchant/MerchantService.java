@@ -1,270 +1,398 @@
 package com.db.foodara.service.merchant;
 
-import com.db.foodara.dto.reponse.merchant.MerchantProfileResponse;
-import com.db.foodara.dto.request.merchant.MerchantRegisterRequest;
-import com.db.foodara.dto.request.merchant.MerchantUpdateProfileRequest;
-import com.db.foodara.dto.request.merchant.bankaccount.BankAccountCreateRequest;
-import com.db.foodara.dto.request.merchant.bankaccount.BankAccountUpdateRequest;
-import com.db.foodara.dto.request.merchant.document.DocumentRequest;
-import com.db.foodara.dto.request.store.StoreAddressRequest;
-import com.db.foodara.dto.request.store.StoreCreateRequest;
-import com.db.foodara.dto.request.store.StoreOperationRequest;
-import com.db.foodara.dto.request.store.StoreStatusRequest;
-import com.db.foodara.entity.merchant.bankaccount.BankAccount;
-import com.db.foodara.entity.merchant.ApprovalMerchantStatus;
-import com.db.foodara.entity.merchant.Merchant;
-import com.db.foodara.entity.merchant.document.Document;
-import com.db.foodara.entity.merchant.store.Store;
+import com.db.foodara.dto.request.merchant.*;
+import com.db.foodara.dto.response.merchant.BankAccountResponse;
+import com.db.foodara.dto.response.merchant.MerchantDocumentResponse;
+import com.db.foodara.dto.response.merchant.MerchantProfileResponse;
+import com.db.foodara.dto.response.store.StoreResponse;
+import com.db.foodara.entity.merchant.*;
+import com.db.foodara.entity.store.Store;
+import com.db.foodara.entity.role.Role;
+import com.db.foodara.entity.user.UserRole;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
-import com.db.foodara.repository.merchant.MerchantRepository;
-import com.db.foodara.repository.merchant.bankaccount.BankAccountRepository;
-import com.db.foodara.repository.merchant.document.DocumentRepository;
-import com.db.foodara.repository.merchant.store.StoreRepository;
-import com.db.foodara.repository.user.UserRepository;
-import lombok.RequiredArgsConstructor;
+import com.db.foodara.repository.merchant.*;
+import com.db.foodara.repository.role.RoleRepository;
+import com.db.foodara.repository.user.UserRoleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PathVariable;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class MerchantService {
-    @Autowired
-    private final MerchantRepository merchantRepository;
-    private final UserRepository userRepository;
-    private final StoreRepository storeRepository;
-    private final DocumentRepository documentRepository;
-    private final BankAccountRepository bankAccountRepository;
 
-    // 83 post -> /api/merchant/register datest
+    @Autowired
+    private MerchantRepository merchantRepository;
+
+    @Autowired
+    private MerchantStoreRepository storeRepository;
+
+    @Autowired
+    private StoreDocumentRepository storeDocumentRepository;
+
+    @Autowired
+    private StoreBankAccountRepository storeBankAccountRepository;
+
+    @Autowired
+    private StoreOperatingHoursRepository storeOperatingHoursRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private UserRoleRepository userRoleRepository;
+
     @Transactional
-    public Merchant registerMerchant(MerchantRegisterRequest request) {
-        System.out.println(request);
-        // merchant response = merchant
-        if (request.getBusinessPhone() == null || merchantRepository.existsMerchantByBusinessPhone(request.getBusinessPhone())) {
-            throw new AppException(ErrorCode.MERCHANT_PHONE_INVALID);
+    public MerchantProfileResponse registerMerchant(String userId, MerchantRegisterRequest request) {
+        if (merchantRepository.existsByOwnerId(userId)) {
+            throw new AppException(ErrorCode.MERCHANT_ALREADY_EXISTS);
         }
-        if (request.getBusinessEmail() == null || merchantRepository.existsMerchantByBusinessEmail(request.getBusinessEmail())) {
-            throw new AppException(ErrorCode.MERCHANT_EMAIL_INVALID);
-        }
-        if (request.getOwnerId() == null || !userRepository.existsById(request.getOwnerId())) {
-            throw new AppException(ErrorCode.USER_NOT_FOUND);
+
+        Role merchantRole = roleRepository.findByName("MERCHANT")
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+
+        boolean hasMerchantRole = userRoleRepository.findByUserId(userId).stream()
+                .anyMatch(ur -> ur.getRoleId().equals(merchantRole.getId()));
+
+        if (!hasMerchantRole) {
+            UserRole userRole = new UserRole();
+            userRole.setUserId(userId);
+            userRole.setRoleId(merchantRole.getId());
+            userRoleRepository.save(userRole);
         }
 
         Merchant merchant = new Merchant();
-        if (request.getName() != null) merchant.setName(request.getName());
-        if (request.getOwnerId() != null) merchant.setOwnerId(request.getOwnerId());
-        if (request.getBusinessEmail() != null) merchant.setBusinessEmail(request.getBusinessEmail());
-        if (request.getBusinessPhone() != null) merchant.setBusinessPhone(request.getBusinessPhone());
-        if (request.getTaxCode() != null) merchant.setTaxCode(request.getTaxCode());
+        merchant.setOwnerId(userId);
+        merchant.setName(request.getName());
+        merchant.setTaxCode(request.getTaxCode());
+        merchant.setBusinessEmail(request.getBusinessEmail());
+        merchant.setBusinessPhone(request.getBusinessPhone());
+        merchant.setLogoUrl(request.getLogoUrl());
+        merchant.setCoverImageUrl(request.getCoverImageUrl());
+        merchant.setApprovalStatus("pending");
 
-        return merchantRepository.save(merchant);
+        Merchant saved = merchantRepository.save(merchant);
+        return mapToMerchantProfileResponse(saved);
     }
 
-    // 84 get merchant profile - xem thông tin merchant -> /api/merchant/profile
-    public MerchantProfileResponse getMerchantProfile(String merchantId) {
-        System.out.println(merchantId);
-        if (merchantId == null) {
-            throw new AppException(ErrorCode.INVALID_KEY);
-        }
-
-        Merchant merchant = merchantRepository.findMerchantById(merchantId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+    public MerchantProfileResponse getProfile(String userId) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
         return mapToMerchantProfileResponse(merchant);
     }
 
-    // 85 UPDATE /api/merchant/profile
-    @Transactional
-    public MerchantProfileResponse updateProfile(String merchantRequestId, MerchantUpdateProfileRequest request) {
-        Merchant merchant = merchantRepository.findMerchantById(merchantRequestId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+    public boolean isMerchant(String userId) {
+        return merchantRepository.existsByOwnerId(userId);
+    }
 
-        if (request.getName() != null) merchant.setName(request.getName());
-        if (request.getBusinessEmail() != null && merchantRepository.existsMerchantByBusinessEmail(request.getBusinessEmail()))
+    @Transactional
+    public MerchantProfileResponse updateProfile(String userId, MerchantProfileRequest request) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        if (request.getName() != null) {
+            merchant.setName(request.getName());
+        }
+        if (request.getTaxCode() != null) {
+            merchant.setTaxCode(request.getTaxCode());
+        }
+        if (request.getBusinessEmail() != null) {
             merchant.setBusinessEmail(request.getBusinessEmail());
-        if (request.getBusinessPhone() != null && merchantRepository.existsMerchantByBusinessPhone(request.getBusinessPhone()))
+        }
+        if (request.getBusinessPhone() != null) {
             merchant.setBusinessPhone(request.getBusinessPhone());
-        if (request.getTaxCode() != null) merchant.setTaxCode(request.getTaxCode());
-        if (request.getLogoUrl() != null) merchant.setLogoUrl(request.getLogoUrl());
-        if (request.getCoverImageUrl() != null) merchant.setCoverImageUrl(request.getCoverImageUrl());
-        if (request.getLogoUrl() != null) merchant.setLogoUrl(request.getLogoUrl());
-
-        merchantRepository.save(merchant);
-
-        return mapToMerchantProfileResponse(merchant);
-    }
-
-    // 86	POST	/api/merchant/documents
-    @Transactional
-    public Document uploadDocument(String merchantId, DocumentRequest request) {
-        Document document = new Document();
-        if(merchantId != null && merchantRepository.existsMerchantById(merchantId)) document.setMerchantId(merchantId);
-        System.out.println(request.getDocumentType() + " " + request.getVerificationStatus());
-        if (request.getDocumentType() != null && request.getVerificationStatus() != null) {
-            document.setDocumentType(request.getDocumentType());
-            document.setVerificationStatus(request.getVerificationStatus());
-        } else {
-            throw new AppException(ErrorCode.DOCUMENT_INVALID);
         }
-        return documentRepository.save(document);
+        if (request.getLogoUrl() != null) {
+            merchant.setLogoUrl(request.getLogoUrl());
+        }
+        if (request.getCoverImageUrl() != null) {
+            merchant.setCoverImageUrl(request.getCoverImageUrl());
+        }
+
+        Merchant updated = merchantRepository.save(merchant);
+        return mapToMerchantProfileResponse(updated);
     }
 
-    // 87 GET /api/merchant/documents
-    public List<Document> getAllDocumentOfMerchant(String merchantId) {
-        return documentRepository.getDocumentsByMerchantId(merchantId).orElseThrow(() -> new AppException(ErrorCode.DOCUMENT_NOT_FOUND));
-    }
-
-    // 88 GET /api/merchant/stores
-    public List<Store> getStoresOfMerchant(String merchantId) {
-        return storeRepository.getStoresByMerchantId(merchantId);
-    }
-
-    // 89 POST /api/merchant/stores
     @Transactional
-    public Store createStore(String merchantId, StoreCreateRequest request) {
+    public MerchantDocumentResponse uploadDocument(String userId, MerchantDocumentRequest request) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        StoreDocument document = new StoreDocument();
+        document.setMerchantId(merchant.getId());
+        document.setStoreId(request.getStoreId());
+        document.setDocumentType(request.getDocumentType());
+        document.setDocumentUrl(request.getDocumentUrl());
+        document.setDocumentNumber(request.getDocumentNumber());
+        document.setExpiryDate(request.getExpiryDate());
+        document.setVerificationStatus("pending");
+
+        StoreDocument saved = storeDocumentRepository.save(document);
+        return mapToDocumentResponse(saved);
+    }
+
+    public List<MerchantDocumentResponse> getDocuments(String userId) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        return storeDocumentRepository.findByMerchantId(merchant.getId()).stream()
+                .map(this::mapToDocumentResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public StoreResponse createStore(String userId, StoreCreateRequest request) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
         Store store = new Store();
-
-        if (merchantId != null && merchantRepository.existsMerchantById(merchantId))
-            store.setMerchantId(merchantId);
-        if (request.getName() != null && !storeRepository.existsByName(request.getName()))
-            store.setName(request.getName());
-        if (request.getSlug() != null && !storeRepository.existsBySlug(request.getSlug()))
-            store.setSlug(request.getSlug());
-        if (request.getAddressLine() != null) store.setAddressLine(request.getAddressLine());
-        if (request.getWard() != null) store.setWard(request.getWard());
-        if (request.getDistrictId() != null) store.setDistrictId(request.getDistrictId());
-        if (request.getCity_id() != null) store.setCity_id(request.getCity_id());
-        if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
-        if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
-        if (request.getServiceZone() != null) store.setServiceZone(request.getServiceZone());
-        // chua  check  E>  city district
-        return storeRepository.save(store);
-    }
-
-    // 90 GET	/api/merchant/stores/:id
-    public Store getStoreDetail(String storeId) {
-        return storeRepository.getStoreById(storeId).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
-    }
-
-    // 91 PUT	/api/merchant/stores/:id
-    @Transactional
-    public Store updateStoreAddress(String id, StoreAddressRequest request) {
-        Store store = storeRepository.getStoreById(id).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
-
-        if (request.getAddressLine() != null) store.setAddressLine(request.getAddressLine());
-        if (request.getWard() != null) store.setWard(request.getWard());
-        if (request.getDistrictId() != null) store.setDistrictId(request.getDistrictId());
-        if (request.getCity_id() != null) store.setCity_id(request.getCity_id());
-        if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
-        if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
-        if (request.getServiceZone() != null) store.setServiceZone(request.getServiceZone());
-
-        return storeRepository.save(store);
-    }
-
-    // 92 put /api/merchant/stores/:id/toggle
-    @Transactional
-    public Store updateStatusStore(String id, StoreStatusRequest request) {
-        Store store = storeRepository.getStoreById(id).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
-        store.setActive(request.isActive());
-        store.setOpen(request.isOpen());
-        store.setAutoAcceptOrders(request.isAutoAcceptOrders());
-        return storeRepository.save(store);
-    }
-
-    // 93 	PUT	/api/merchant/stores/:id/operating-hours
-    @Transactional
-    public Store updateOperationStore(String id, StoreOperationRequest request) {
-        Store store = storeRepository.getStoreById(id).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
-        store.setAvgPreparationTime(request.getAvgPreparationTime());
-        store.setMinOrderAmount(request.getMinOrderAmount());
+        store.setMerchantId(merchant.getId());
+        store.setName(request.getName());
+        store.setSlug(request.getSlug());
+        store.setDescription(request.getDescription());
+        store.setPhone(request.getPhone());
+        store.setAddressLine(request.getAddressLine());
+        store.setWard(request.getWard());
+        store.setDistrictId(request.getDistrictId());
+        store.setCityId(request.getCityId());
+        store.setLatitude(request.getLatitude());
+        store.setLongitude(request.getLongitude());
+        store.setServiceZoneId(request.getServiceZoneId());
+        store.setAutoAcceptOrders(request.getAutoAcceptOrders() != null ? request.getAutoAcceptOrders() : false);
+        store.setAvgPreparationTime(request.getAvgPreparationTime() != null ? request.getAvgPreparationTime() : 15);
+        store.setMinOrderAmount(request.getMinOrderAmount() != null ? request.getMinOrderAmount() : java.math.BigDecimal.ZERO);
         store.setMaxDeliveryRadiusKm(request.getMaxDeliveryRadiusKm());
-        return storeRepository.save(store);
+        store.setCoverImageUrl(request.getCoverImageUrl());
+        store.setLogoUrl(request.getLogoUrl());
+        store.setIsOpen(false);
+        store.setIsActive(true);
+
+        Store saved = storeRepository.save(store);
+        return mapToStoreResponse(saved);
     }
 
-    // 94	GET	/api/merchant/bank-accounts
-    public List<BankAccount> getBankAccountOfMerchant(String merchantId) {
-        return bankAccountRepository.getBankAccountsByAccountHolder(merchantId).orElseThrow(() -> new AppException(ErrorCode.BANK_ACCOUNT_NOT_FOUND));
+    public List<StoreResponse> getStores(String userId) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        return storeRepository.findByMerchantId(merchant.getId()).stream()
+                .map(this::mapToStoreResponse)
+                .collect(Collectors.toList());
     }
 
-    // 95	POST	/api/merchant/bank-accounts
+    public StoreResponse getStore(String userId, String storeId) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        Store store = storeRepository.findByIdAndMerchantId(storeId, merchant.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        return mapToStoreResponse(store);
+    }
+
     @Transactional
-    public BankAccount createBankAccount(String merchantId, String storeId, BankAccountCreateRequest request) {
-        if (!merchantRepository.existsMerchantById(merchantId)) {
-            throw new AppException(ErrorCode.MERCHANT_NOT_FOUND);
+    public StoreResponse updateStore(String userId, String storeId, StoreUpdateRequest request) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        Store store = storeRepository.findByIdAndMerchantId(storeId, merchant.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        if (request.getName() != null) store.setName(request.getName());
+        if (request.getSlug() != null) store.setSlug(request.getSlug());
+        if (request.getDescription() != null) store.setDescription(request.getDescription());
+        if (request.getPhone() != null) store.setPhone(request.getPhone());
+        if (request.getAddressLine() != null) store.setAddressLine(request.getAddressLine());
+        if (request.getWard() != null) store.setWard(request.getWard());
+        if (request.getDistrictId() != null) store.setDistrictId(request.getDistrictId());
+        if (request.getCityId() != null) store.setCityId(request.getCityId());
+        if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
+        if (request.getServiceZoneId() != null) store.setServiceZoneId(request.getServiceZoneId());
+        if (request.getAutoAcceptOrders() != null) store.setAutoAcceptOrders(request.getAutoAcceptOrders());
+        if (request.getAvgPreparationTime() != null) store.setAvgPreparationTime(request.getAvgPreparationTime());
+        if (request.getMinOrderAmount() != null) store.setMinOrderAmount(request.getMinOrderAmount());
+        if (request.getMaxDeliveryRadiusKm() != null) store.setMaxDeliveryRadiusKm(request.getMaxDeliveryRadiusKm());
+        if (request.getCoverImageUrl() != null) store.setCoverImageUrl(request.getCoverImageUrl());
+        if (request.getLogoUrl() != null) store.setLogoUrl(request.getLogoUrl());
+
+        Store updated = storeRepository.save(store);
+        return mapToStoreResponse(updated);
+    }
+
+    @Transactional
+    public StoreResponse toggleStore(String userId, String storeId) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        Store store = storeRepository.findByIdAndMerchantId(storeId, merchant.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        store.setIsOpen(!store.getIsOpen());
+        Store updated = storeRepository.save(store);
+        return mapToStoreResponse(updated);
+    }
+
+    @Transactional
+    public void updateOperatingHours(String userId, String storeId, List<StoreOperatingHoursRequest> requests) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        Store store = storeRepository.findByIdAndMerchantId(storeId, merchant.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        storeOperatingHoursRepository.deleteByStoreId(storeId);
+
+        for (StoreOperatingHoursRequest request : requests) {
+            StoreOperatingHours hours = new StoreOperatingHours();
+            hours.setStoreId(store.getId());
+            hours.setDayOfWeek(request.getDayOfWeek());
+            hours.setOpenTime(request.getOpenTime());
+            hours.setCloseTime(request.getCloseTime());
+            hours.setIsClosed(request.getIsClosed() != null ? request.getIsClosed() : false);
+            storeOperatingHoursRepository.save(hours);
         }
-        if (!storeRepository.existsByMerchantIdAndId(merchantId, storeId)) {
-            throw new AppException(ErrorCode.STORE_NOT_FOUND);
-        }
-        if (request.getAccountNumber() != null && bankAccountRepository.existsByAccountNumber(request.getAccountNumber())) {
-            throw new AppException(ErrorCode.BANK_ACCOUNT_ALREADY_EXISTS);
+    }
+
+    @Transactional
+    public BankAccountResponse addBankAccount(String userId, BankAccountRequest request) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        if (Boolean.TRUE.equals(request.getIsDefault())) {
+            storeBankAccountRepository.findByMerchantId(merchant.getId())
+                    .forEach(acc -> {
+                        acc.setIsDefault(false);
+                        storeBankAccountRepository.save(acc);
+                    });
         }
 
-        BankAccount bankAccount = new BankAccount();
-
-        if (request.getBankName() != null) {
-            bankAccount.setBankName(request.getBankName());
-        }
-
+        StoreBankAccount bankAccount = new StoreBankAccount();
+        bankAccount.setMerchantId(merchant.getId());
+        bankAccount.setBankName(request.getBankName());
         bankAccount.setAccountNumber(request.getAccountNumber());
-        bankAccount.setAccountHolder(merchantId);
-        bankAccount.setBranch(storeId);
-        return bankAccountRepository.save(bankAccount);
+        bankAccount.setAccountHolder(request.getAccountHolder());
+        bankAccount.setBranch(request.getBranch());
+        bankAccount.setIsDefault(request.getIsDefault() != null ? request.getIsDefault() : false);
+        bankAccount.setIsVerified(false);
+
+        StoreBankAccount saved = storeBankAccountRepository.save(bankAccount);
+        return mapToBankAccountResponse(saved);
     }
 
-    // 96	PUT	/api/merchant/bank-accounts/:id
+    public List<BankAccountResponse> getBankAccounts(String userId) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        return storeBankAccountRepository.findByMerchantId(merchant.getId()).stream()
+                .map(this::mapToBankAccountResponse)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
-    public BankAccount updateBankAccount(String id, BankAccountUpdateRequest request) {
-        BankAccount bankAccount = bankAccountRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.BANK_ACCOUNT_NOT_FOUND));
-        if (request.getBankName() != null) {
-            bankAccount.setBankName(request.getBankName());
+    public BankAccountResponse updateBankAccount(String userId, String accountId, BankAccountRequest request) {
+        Merchant merchant = merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+
+        StoreBankAccount bankAccount = storeBankAccountRepository.findByIdAndMerchantId(accountId, merchant.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_BANK_ACCOUNT_NOT_FOUND));
+
+        if (Boolean.TRUE.equals(request.getIsDefault())) {
+            storeBankAccountRepository.findByMerchantId(merchant.getId())
+                    .forEach(acc -> {
+                        if (!acc.getId().equals(accountId)) {
+                            acc.setIsDefault(false);
+                            storeBankAccountRepository.save(acc);
+                        }
+                    });
         }
-        if (request.getBranch() != null) {
-            if (!storeRepository.existsById(request.getBranch())) {
-                throw new AppException(ErrorCode.STORE_NOT_FOUND);
-            }
-            bankAccount.setBranch(request.getBranch());
-        }
-        return bankAccountRepository.save(bankAccount);
+
+        if (request.getBankName() != null) bankAccount.setBankName(request.getBankName());
+        if (request.getAccountNumber() != null) bankAccount.setAccountNumber(request.getAccountNumber());
+        if (request.getAccountHolder() != null) bankAccount.setAccountHolder(request.getAccountHolder());
+        if (request.getBranch() != null) bankAccount.setBranch(request.getBranch());
+        if (request.getIsDefault() != null) bankAccount.setIsDefault(request.getIsDefault());
+
+        StoreBankAccount updated = storeBankAccountRepository.save(bankAccount);
+        return mapToBankAccountResponse(updated);
     }
 
-    // merchant -> merchantProfile
-    private MerchantProfileResponse mapToMerchantProfileResponse(Merchant merchant) {
+    private MerchantProfileResponse mapToMerchantProfileResponse(Merchant m) {
         return MerchantProfileResponse.builder()
-                .name(merchant.getName())
-                .taxCode(merchant.getTaxCode())
-                .businessEmail(merchant.getBusinessEmail())
-                .businessPhone(merchant.getBusinessPhone())
-                .logoUrl(merchant.getLogoUrl())
-                .coverImageUrl(merchant.getCoverImageUrl())
-                .approvalStatus(merchant.getApprovalStatus())
-                .createdAt(merchant.getCreatedAt())
-                .updatedAt(LocalDateTime.now())
+                .id(m.getId())
+                .ownerId(m.getOwnerId())
+                .name(m.getName())
+                .taxCode(m.getTaxCode())
+                .businessEmail(m.getBusinessEmail())
+                .businessPhone(m.getBusinessPhone())
+                .logoUrl(m.getLogoUrl())
+                .coverImageUrl(m.getCoverImageUrl())
+                .approvalStatus(m.getApprovalStatus())
+                .createdAt(m.getCreatedAt())
+                .updatedAt(m.getUpdatedAt())
                 .build();
     }
 
-
-    // confirm merchant // update ApprovalMerchantStatus
-    public String responseRequestMerchant(String id, ApprovalMerchantStatus reques) {
-        Merchant merchant = merchantRepository.findMerchantById(id).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
-
-        merchant.setApprovalStatus(reques);
-        merchantRepository.save(merchant);
-        return reques.toString();
+    private MerchantDocumentResponse mapToDocumentResponse(StoreDocument d) {
+        return MerchantDocumentResponse.builder()
+                .id(d.getId())
+                .merchantId(d.getMerchantId())
+                .storeId(d.getStoreId())
+                .documentType(d.getDocumentType())
+                .documentUrl(d.getDocumentUrl())
+                .documentNumber(d.getDocumentNumber())
+                .expiryDate(d.getExpiryDate())
+                .verificationStatus(d.getVerificationStatus())
+                .verifiedAt(d.getVerifiedAt())
+                .verifiedBy(d.getVerifiedBy())
+                .createdAt(d.getCreatedAt())
+                .updatedAt(d.getUpdatedAt())
+                .build();
     }
 
-    // update status (approval) -> cho admin
-    @Transactional
-    public MerchantProfileResponse updateStatus(String merchantRequestId, ApprovalMerchantStatus request) {
-        Merchant merchant = merchantRepository.findMerchantById(merchantRequestId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
-        if (request != null) merchant.setApprovalStatus(request);
-        merchantRepository.save(merchant);
-
-        return mapToMerchantProfileResponse(merchant);
+    private StoreResponse mapToStoreResponse(Store s) {
+        return StoreResponse.builder()
+                .id(s.getId())
+                .name(s.getName())
+                .slug(s.getSlug())
+                .description(s.getDescription())
+                .phone(s.getPhone())
+                .addressLine(s.getAddressLine())
+                .ward(s.getWard())
+                .districtId(s.getDistrictId())
+                .cityId(s.getCityId())
+                .latitude(s.getLatitude())
+                .longitude(s.getLongitude())
+                .serviceZoneId(s.getServiceZoneId())
+                .isOpen(s.getIsOpen())
+                .isActive(s.getIsActive())
+                .autoAcceptOrders(s.getAutoAcceptOrders())
+                .avgPreparationTime(s.getAvgPreparationTime())
+                .minOrderAmount(s.getMinOrderAmount())
+                .avgRating(s.getAvgRating())
+                .totalRatings(s.getTotalRatings())
+                .totalOrders(s.getTotalOrders())
+                .coverImageUrl(s.getCoverImageUrl())
+                .logoUrl(s.getLogoUrl())
+                .createdAt(s.getCreatedAt())
+                .build();
     }
 
+    private BankAccountResponse mapToBankAccountResponse(StoreBankAccount b) {
+        return BankAccountResponse.builder()
+                .id(b.getId())
+                .merchantId(b.getMerchantId())
+                .bankName(b.getBankName())
+                .accountNumber(b.getAccountNumber())
+                .accountHolder(b.getAccountHolder())
+                .branch(b.getBranch())
+                .isDefault(b.getIsDefault())
+                .isVerified(b.getIsVerified())
+                .createdAt(b.getCreatedAt())
+                .updatedAt(b.getUpdatedAt())
+                .build();
+    }
 }

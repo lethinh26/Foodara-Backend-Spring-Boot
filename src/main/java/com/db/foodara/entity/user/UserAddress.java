@@ -16,7 +16,6 @@ public class UserAddress {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "user_id", nullable = false)
     private String userId;
 
     @Column(length = 50)
@@ -34,10 +33,8 @@ public class UserAddress {
     @Column(length = 100)
     private String ward;
 
-    @Column(name = "district_id")
     private String districtId;
 
-    @Column(name = "city_id")
     private String cityId;
 
     @Column(precision = 10, scale = 8)
@@ -69,4 +66,3 @@ public class UserAddress {
         updatedAt = LocalDateTime.now();
     }
 }
-

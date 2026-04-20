@@ -15,14 +15,11 @@ public class UserSession {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private String userId;
 
     @Column(name = "token_hash", nullable = false, length = 255)
     private String tokenHash;
-
-    @Column(name = "device_id")
-    private String deviceId;
 
     @Column(name = "ip_address", length = 45)
     private String ipAddress;

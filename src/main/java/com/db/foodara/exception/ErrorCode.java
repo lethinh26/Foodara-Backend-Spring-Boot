@@ -19,7 +19,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(1201, "User not found"),
     EMAIL_EXISTS(1202, "Email already exists"),
     PHONE_EXISTS(1203, "Phone already exists"),
-    USERNAME_INVALID(1204, "Username must be at least 3 characters"),
+    USERNAME_INVALID(1204, "Username must be at least 8 characters"),
     PASSWORD_INVALID(1205, "Password must be at least 8 characters"),
     EMAIL_INVALID(1206, "Email isn't valid"),
     PHONE_INVALID(1207, "Phone isn't valid"),
@@ -58,8 +58,34 @@ public enum ErrorCode {
     BANK_ACCOUNT_ALREADY_EXISTS(1803, "Bank account is existed"),
 
     SESSION_NOT_FOUND(1400, "Session not found"),
-    DEVICE_NOT_FOUND(1401, "Device not found"),
-            ;
+
+    // Location
+    CITY_NOT_FOUND(1500, "City not found"),
+    DISTRICT_NOT_FOUND(1501, "District not found"),
+    SERVICE_ZONE_NOT_FOUND(1502, "Service zone not found"),
+    LOCATION_NOT_COVERED(1503, "Location is not within service coverage"),
+    GEOCODING_FAILED(1504, "Geocoding failed"),
+    INVALID_COORDINATES(1505, "Invalid latitude or longitude"),
+    DISTRICT_NOT_IN_CITY(1506, "District does not belong to specified city"),
+
+    // Store & Categories
+    STORE_CATEGORY_EXISTED(1600, "Store category already existed"),
+    STORE_CATEGORY_NOT_FOUND(1601, "Store category not found"),
+    STORE_NOT_FOUND(1602, "Store not found"),
+    MENU_CATEGORY_NAME_EXISTED(1603, "Name of Menu category is existed"),
+    MENU_CATEGORY_NOT_FOUND(1603, "Menu category is not found"),
+    MENU_ITEM_NAME_INVALID(1604, "Menu category name is invalid"),
+    MENU_ITEM_NOT_FOUND(1605, "Menu item not found"),
+    OPTION_GROUP_NOT_FOUND(1606, "Option group not found"),
+    COMBO_ITEMS_REQUIRED(1607, "Combo items is required"),
+    COMBO_NOT_FOUND(1608, "Combo is not founded"),
+
+    // Merchant
+    MERCHANT_NOT_FOUND(1700, "Merchant not found"),
+    MERCHANT_ALREADY_EXISTS(1701, "Merchant already exists for this user"),
+    MERCHANT_DOCUMENT_NOT_FOUND(1702, "Document not found"),
+    MERCHANT_BANK_ACCOUNT_NOT_FOUND(1703, "Bank account not found");
+    ;
     private int code;
     private String message;
 

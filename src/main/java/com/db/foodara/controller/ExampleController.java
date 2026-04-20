@@ -1,6 +1,6 @@
 package com.db.foodara.controller;
 
-import com.db.foodara.dto.reponse.ApiResponse;
+import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.request.ExampleCreationRequest;
 import com.db.foodara.dto.request.ExampleUpdateRequest;
 import com.db.foodara.entity.Example;

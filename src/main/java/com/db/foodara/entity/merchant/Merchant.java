@@ -1,59 +1,60 @@
 package com.db.foodara.entity.merchant;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "merchants")
+@Getter
+@Setter
 public class Merchant {
+
     @Id
-    @GeneratedValue(generator = "UUID")
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
     @Column(name = "owner_id", nullable = false)
     private String ownerId;
 
-    @Column( length = 255)
-    @Size(min = 6,  message = "MERCHANT_NAME_INVALID")
+    @Column(nullable = false)
     private String name;
 
-
-    @Size(max = 13, min = 10,message = "TAX_CODE_INVALID")
+    @Column(name = "tax_code", length = 50)
     private String taxCode;
 
-    @Pattern(
-            regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}$",
-            message = "MERCHANT_EMAIL_INVALID"
-    )
-    @Column(name = "business_email" ,nullable = false, length = 255)
-    @Size(min = 8)
+    @Column(name = "business_email", length = 255)
     private String businessEmail;
 
     @Column(name = "business_phone", length = 20)
-    @Pattern(
-            regexp = "0[0-9]{9}",
-            message = "MERCHANT_PHONE_INVALID"
-    )
     private String businessPhone;
 
-    @Column(name = "logo_url")
+    @Column(name = "logo_url", length = 500)
     private String logoUrl;
-    @Column(name = "cover_image_url")
+
+    @Column(name = "cover_image_url", length = 500)
     private String coverImageUrl;
 
-    @Column(name = "approval_status")
-    private ApprovalMerchantStatus approvalStatus = ApprovalMerchantStatus.PENDING;
+    @Column(name = "approval_status", length = 20)
+    private String approvalStatus = "pending";
 
-    @Column(name = "create_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-    @Column(name = "update_at")
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        if (approvalStatus == null) approvalStatus = "pending";
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

@@ -1,11 +1,9 @@
 package com.db.foodara.controller.user;
 
-import com.db.foodara.dto.reponse.ApiResponse;
-import com.db.foodara.dto.reponse.user.AddressResponse;
-import com.db.foodara.dto.reponse.user.DeviceResponse;
-import com.db.foodara.dto.reponse.user.UserProfileResponse;
+import com.db.foodara.dto.response.ApiResponse;
+import com.db.foodara.dto.response.user.AddressResponse;
+import com.db.foodara.dto.response.user.UserProfileResponse;
 import com.db.foodara.dto.request.user.AddressRequest;
-import com.db.foodara.dto.request.user.DeviceRequest;
 import com.db.foodara.dto.request.user.UpdateProfileRequest;
 import com.db.foodara.service.user.UserService;
 import jakarta.validation.Valid;
@@ -70,24 +68,5 @@ public class UserController {
     @PutMapping("/me/addresses/{id}/default")
     public ApiResponse<AddressResponse> setDefaultAddress(Authentication authentication, @PathVariable String id) {
         return ApiResponse.success(userService.setDefaultAddress(authentication.getName(), id));
-    }
-
-    // GET /api/users/me/devices
-    @GetMapping("/me/devices")
-    public ApiResponse<List<DeviceResponse>> getDevices(Authentication authentication) {
-        return ApiResponse.success(userService.getDevices(authentication.getName()));
-    }
-
-    // POST /api/users/me/devices
-    @PostMapping("/me/devices")
-    public ApiResponse<DeviceResponse> registerDevice(Authentication authentication, @RequestBody @Valid DeviceRequest request) {
-        return ApiResponse.success("Device registered", userService.registerDevice(authentication.getName(), request));
-    }
-
-    // DELETE /api/users/me/devices/{id}
-    @DeleteMapping("/me/devices/{id}")
-    public ApiResponse<Void> deleteDevice(Authentication authentication, @PathVariable String id) {
-        userService.deleteDevice(authentication.getName(), id);
-        return ApiResponse.success("Device deleted");
     }
 }
