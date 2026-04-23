@@ -56,7 +56,13 @@ public enum ErrorCode {
     MERCHANT_NOT_FOUND(1700, "Merchant not found"),
     MERCHANT_ALREADY_EXISTS(1701, "Merchant already exists for this user"),
     MERCHANT_DOCUMENT_NOT_FOUND(1702, "Document not found"),
-    MERCHANT_BANK_ACCOUNT_NOT_FOUND(1703, "Bank account not found");
+    MERCHANT_BANK_ACCOUNT_NOT_FOUND(1703, "Bank account not found"),
+
+
+    // order
+    ORDER_NOT_FOUND(1800, "Order not found"),
+    WRONG_ORDER(1801, "Wrong store order of other owner")
+
     ;
     private int code;
     private String message;
