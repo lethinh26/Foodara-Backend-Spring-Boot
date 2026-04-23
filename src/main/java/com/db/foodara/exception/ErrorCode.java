@@ -44,12 +44,25 @@ public enum ErrorCode {
     STORE_CATEGORY_EXISTED(1600, "Store category already existed"),
     STORE_CATEGORY_NOT_FOUND(1601, "Store category not found"),
     STORE_NOT_FOUND(1602, "Store not found"),
+    MENU_CATEGORY_NAME_EXISTED(1603, "Name of Menu category is existed"),
+    MENU_CATEGORY_NOT_FOUND(1603, "Menu category is not found"),
+    MENU_ITEM_NAME_INVALID(1604, "Menu category name is invalid"),
+    MENU_ITEM_NOT_FOUND(1605, "Menu item not found"),
+    OPTION_GROUP_NOT_FOUND(1606, "Option group not found"),
+    COMBO_ITEMS_REQUIRED(1607, "Combo items is required"),
+    COMBO_NOT_FOUND(1608, "Combo is not founded"),
 
     // Merchant
     MERCHANT_NOT_FOUND(1700, "Merchant not found"),
     MERCHANT_ALREADY_EXISTS(1701, "Merchant already exists for this user"),
     MERCHANT_DOCUMENT_NOT_FOUND(1702, "Document not found"),
     MERCHANT_BANK_ACCOUNT_NOT_FOUND(1703, "Bank account not found"),
+
+
+    // order
+    ORDER_NOT_FOUND(1800, "Order not found"),
+    WRONG_ORDER(1801, "Wrong store order of other owner")
+
     ;
     private int code;
     private String message;

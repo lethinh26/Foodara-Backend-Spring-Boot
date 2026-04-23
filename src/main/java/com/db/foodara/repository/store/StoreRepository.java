@@ -45,4 +45,6 @@ public interface StoreRepository extends JpaRepository<Store, String>, JpaSpecif
             @Param("limit") int limit);
 
     Page<Store> findByIsActiveTrueAndIsOpenTrue(Pageable pageable);
+
+    Optional<Store> findStoreById(String id);
 }
