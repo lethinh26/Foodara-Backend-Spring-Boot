@@ -5,6 +5,7 @@ import com.db.foodara.entity.store.*;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.store.*;
+import com.db.foodara.repository.merchant.StoreOperatingHoursRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,9 @@ public class StoreService {
     private final OptionGroupRepository optionGroupRepository;
     private final OptionItemRepository optionItemRepository;
     private final MenuItemOptionGroupRepository menuItemOptionGroupRepository;
+    private final ComboRepository comboRepository;
+    private final ComboItemRepository comboItemRepository;
+    private final StoreOperatingHoursRepository storeOperatingHoursRepository;
 
     // C06: GET /v1/stores/:id
     public StoreResponse getStoreById(String id) {
@@ -132,6 +136,128 @@ public class StoreService {
                     return mapToMenuItemDetailResponse(item, optionGroups);
                 })
                 .collect(Collectors.toList());
+    }
+
+    // C06 docs alias: GET /v1/stores/:id/menu
+    public List<MenuCategoryResponse> getMenu(String storeId) {
+        return getMenuCategories(storeId);
+    }
+
+    // C07: GET /v1/menu-items/:id
+    public MenuItemDetailResponse getMenuItemById(String id) {
+        MenuItem item = menuItemRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.MENU_ITEM_NOT_FOUND));
+        return mapToMenuItemDetailResponse(item, getOptionGroupsForMenuItem(item));
+    }
+
+    // C07: GET /v1/menu-items/:id/options
+    public List<OptionGroupResponse> getMenuItemOptions(String id) {
+        MenuItem item = menuItemRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.MENU_ITEM_NOT_FOUND));
+        return getOptionGroupsForMenuItem(item);
+    }
+
+    // C06: GET /v1/stores/:id/operating-hours
+    public List<OperatingHourResponse> getOperatingHours(String storeId) {
+        storeRepository.findById(storeId)
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        return storeOperatingHoursRepository.findByStoreId(storeId).stream()
+                .map(this::mapToOperatingHourResponse)
+                .collect(Collectors.toList());
+    }
+
+    // C06: GET /v1/stores/:id/combos
+    public List<ComboResponse> getCombos(String storeId) {
+        storeRepository.findById(storeId)
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        List<Combo> combos = comboRepository.findByStoreIdAndIsActiveTrueOrderByDisplayOrderAsc(storeId);
+        if (combos.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> comboIds = combos.stream().map(Combo::getId).collect(Collectors.toList());
+        Map<String, List<ComboItem>> itemsByComboId = comboItemRepository.findByComboIdIn(comboIds).stream()
+                .collect(Collectors.groupingBy(ComboItem::getComboId));
+        Map<String, MenuItem> menuItemsById = menuItemRepository.findByStoreId(storeId).stream()
+                .collect(Collectors.toMap(MenuItem::getId, item -> item, (a, b) -> a));
+
+        return combos.stream()
+                .map(combo -> mapToComboResponse(combo, itemsByComboId.getOrDefault(combo.getId(), Collections.emptyList()), menuItemsById))
+                .collect(Collectors.toList());
+    }
+
+    private List<OptionGroupResponse> getOptionGroupsForMenuItem(MenuItem item) {
+        List<MenuItemOptionGroup> links = menuItemOptionGroupRepository.findByMenuItemId(item.getId());
+        if (links.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> groupIds = links.stream()
+                .map(MenuItemOptionGroup::getOptionGroupId)
+                .collect(Collectors.toList());
+        Map<String, OptionGroup> groupsById = optionGroupRepository.findAllById(groupIds).stream()
+                .collect(Collectors.toMap(OptionGroup::getId, group -> group));
+        Map<String, List<OptionItem>> optionsByGroupId = optionItemRepository.findByOptionGroupIdInOrderByDisplayOrder(groupIds).stream()
+                .collect(Collectors.groupingBy(OptionItem::getOptionGroupId));
+
+        return links.stream()
+                .map(link -> groupsById.get(link.getOptionGroupId()))
+                .filter(Objects::nonNull)
+                .map(group -> OptionGroupResponse.builder()
+                        .id(group.getId())
+                        .storeId(group.getStoreId())
+                        .name(group.getName())
+                        .isRequired(group.getIsRequired())
+                        .minSelections(group.getMinSelections())
+                        .maxSelections(group.getMaxSelections())
+                        .displayOrder(group.getDisplayOrder())
+                        .options(optionsByGroupId.getOrDefault(group.getId(), Collections.emptyList()).stream()
+                                .map(this::mapToOptionItemResponse)
+                                .collect(Collectors.toList()))
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private OperatingHourResponse mapToOperatingHourResponse(com.db.foodara.entity.merchant.StoreOperatingHours h) {
+        return OperatingHourResponse.builder()
+                .id(h.getId())
+                .storeId(h.getStoreId())
+                .dayOfWeek(h.getDayOfWeek())
+                .openTime(h.getOpenTime())
+                .closeTime(h.getCloseTime())
+                .isClosed(h.getIsClosed())
+                .createdAt(h.getCreatedAt())
+                .updatedAt(h.getUpdatedAt())
+                .build();
+    }
+
+    private ComboResponse mapToComboResponse(Combo combo, List<ComboItem> items, Map<String, MenuItem> menuItemsById) {
+        List<ComboResponse.ComboItemResponse> itemResponses = items.stream()
+                .map(item -> {
+                    MenuItem menuItem = menuItemsById.get(item.getMenuItemId());
+                    return ComboResponse.ComboItemResponse.builder()
+                            .id(item.getId())
+                            .menuItemId(item.getMenuItemId())
+                            .menuItemName(menuItem != null ? menuItem.getName() : null)
+                            .quantity(item.getQuantity())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return ComboResponse.builder()
+                .id(combo.getId())
+                .storeId(combo.getStoreId())
+                .name(combo.getName())
+                .description(combo.getDescription())
+                .comboPrice(combo.getComboPrice())
+                .originalPrice(combo.getOriginalPrice())
+                .isActive(combo.getIsActive())
+                .startsAt(combo.getStartsAt())
+                .endsAt(combo.getEndsAt())
+                .items(itemResponses)
+                .build();
     }
 
     private OptionItemResponse mapToOptionItemResponse(OptionItem o) {

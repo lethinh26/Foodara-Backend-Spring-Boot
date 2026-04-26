@@ -32,7 +32,7 @@ public enum ErrorCode {
     // merchant
     MERCHANT_NAME_INVALID(1500, "Merchant name isn't valid"),
     TAX_CODE_INVALID(1501, "Tax code isn't valid"),
-    MERCHANT_NOT_FOUND(1502, "Merchant not found"),
+    MERCHANT_OWNER_NOT_FOUND(1502, "Merchant not found"),
     MERCHANT_EMAIL_INVALID(1503, "Merchant's email isn't valid"),
     MERCHANT_PHONE_INVALID(1504, "Merchant's phone isn't valid"),
     MERCHANT_ID_REQUIRED(1602, "Merchant ID is required"),
@@ -40,7 +40,7 @@ public enum ErrorCode {
 
     // store
     STORE_NAME_INVALID(1600, "Store's name isn't valid"),
-    STORE_NOT_FOUND(1601, "Store not found"),
+    STORE_BASE_NOT_FOUND(1601, "Store not found"),
     STORE_NAME_REQUIRED(1603, "Store name is required"),
     SLUG_REQUIRED(1604, "Slug is required"),
     SLUG_INVALID_FORMAT(1602, "Slug format is invalid"),
@@ -89,7 +89,15 @@ public enum ErrorCode {
 
     // order
     ORDER_NOT_FOUND(1800, "Order not found"),
-    WRONG_ORDER(1801, "Wrong store order of other owner")
+    WRONG_ORDER(1801, "Wrong store order of other owner"),
+
+    // cart
+    CART_NOT_FOUND(1900, "Cart not found"),
+    CART_ITEM_NOT_FOUND(1901, "Cart item not found"),
+    CART_INVALID_REQUEST(1902, "Cart request is invalid"),
+    CART_INVALID_OPTION(1903, "Cart item options are invalid"),
+    CART_ITEM_UNAVAILABLE(1904, "Cart item is unavailable"),
+    CART_STORE_MISMATCH(1905, "Cart item does not belong to selected store")
 
     ;
     private int code;

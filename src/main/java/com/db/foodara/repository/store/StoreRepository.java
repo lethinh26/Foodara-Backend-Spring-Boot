@@ -47,4 +47,10 @@ public interface StoreRepository extends JpaRepository<Store, String>, JpaSpecif
     Page<Store> findByIsActiveTrueAndIsOpenTrue(Pageable pageable);
 
     Optional<Store> findStoreById(String id);
+
+    List<Store> findByMerchantId(String merchantId);
+
+    Optional<Store> findByIdAndMerchantId(String id, String merchantId);
+
+    boolean existsByMerchantIdAndName(String merchantId, String name);
 }

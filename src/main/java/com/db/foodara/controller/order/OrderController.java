@@ -7,18 +7,19 @@ import com.db.foodara.service.order.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Controller
-@RequestMapping("/merchant/stores/{storeId}/orders")
+@RestController
+@RequestMapping("/v1/merchant/stores/{storeId}/orders")
+@PreAuthorize("hasRole('MERCHANT')")
 public class OrderController {
     @Autowired
     private OrderService orderService;
 
-    @GetMapping("/:storeId/orders")
+    @GetMapping
     public ApiResponse<List<Order>> getAllOrder(Authentication authentication,
                                                 @PathVariable String storeId){
         String userId = authentication.getName();
