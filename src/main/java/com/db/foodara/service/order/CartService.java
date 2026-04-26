@@ -4,6 +4,7 @@ import com.db.foodara.dto.request.order.AddCartItemRequest;
 import com.db.foodara.dto.request.order.UpdateCartItemRequest;
 import com.db.foodara.dto.response.order.CartResponse;
 import com.db.foodara.dto.response.order.CartValidationResponse;
+import com.db.foodara.dto.response.promotion.VoucherCartPricingResponse;
 import com.db.foodara.entity.order.Cart;
 import com.db.foodara.entity.order.CartItem;
 import com.db.foodara.entity.order.CartItemOption;
@@ -15,6 +16,7 @@ import com.db.foodara.repository.order.CartItemRepository;
 import com.db.foodara.repository.order.CartRepository;
 import com.db.foodara.repository.store.*;
 import com.db.foodara.repository.user.UserRepository;
+import com.db.foodara.service.promotion.VoucherService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,11 +42,12 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final CartItemOptionRepository cartItemOptionRepository;
+    private final VoucherService voucherService;
 
     public CartResponse getCart(String userId) {
         ensureUserExists(userId);
         return cartRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId)
-                .map(this::mapCartResponse)
+                .map(cart -> mapCartResponse(cart, userId))
                 .orElseGet(() -> emptyCart(userId));
     }
 
@@ -79,7 +82,7 @@ public class CartService {
 
         saveCartItemOptions(cartItem, selection.selectedOptions);
         touchCart(cart);
-        return mapCartResponse(cart);
+        return mapCartResponse(cart, userId);
     }
 
     @Transactional
@@ -117,7 +120,7 @@ public class CartService {
         cartItemOptionRepository.deleteByCartItemId(cartItemId);
         saveCartItemOptions(cartItem, selection.selectedOptions);
         touchCart(cartItem.getCart());
-        return mapCartResponse(cartItem.getCart());
+        return mapCartResponse(cartItem.getCart(), userId);
     }
 
     @Transactional
@@ -136,7 +139,7 @@ public class CartService {
         }
 
         touchCart(cart);
-        return mapCartResponse(cart);
+        return mapCartResponse(cart, userId);
     }
 
     @Transactional
@@ -157,7 +160,7 @@ public class CartService {
                     .subtotal(BigDecimal.ZERO)
                     .minOrderAmount(BigDecimal.ZERO)
                     .shortfallAmount(BigDecimal.ZERO)
-                    .issues(List.of(issue("EMPTY_CART", "Giỏ hàng đang trống", null)))
+                    .issues(List.of(issue("EMPTY_CART", "Gio hang dang trong", null)))
                     .build();
         }
 
@@ -172,13 +175,13 @@ public class CartService {
         Store store = storeRepository.findById(cart.getStoreId()).orElse(null);
         BigDecimal minOrderAmount = BigDecimal.ZERO;
         if (store == null) {
-            issues.add(issue("STORE_NOT_FOUND", "Không tìm thấy cửa hàng của giỏ hàng", null));
+            issues.add(issue("STORE_NOT_FOUND", "Khong tim thay cua hang cua gio hang", null));
         } else {
             if (!Boolean.TRUE.equals(store.getIsOpen())) {
-                issues.add(issue("STORE_CLOSED", "Cửa hàng hiện đang đóng cửa", null));
+                issues.add(issue("STORE_CLOSED", "Cua hang hien dang dong cua", null));
             }
             if (!Boolean.TRUE.equals(store.getIsActive())) {
-                issues.add(issue("STORE_INACTIVE", "Cửa hàng hiện không hoạt động", null));
+                issues.add(issue("STORE_INACTIVE", "Cua hang hien khong hoat dong", null));
             }
             minOrderAmount = defaultAmount(store.getMinOrderAmount());
         }
@@ -211,7 +214,7 @@ public class CartService {
 
         BigDecimal shortfall = minOrderAmount.subtract(subtotal).max(BigDecimal.ZERO);
         if (shortfall.compareTo(BigDecimal.ZERO) > 0) {
-            issues.add(issue("MIN_ORDER_NOT_REACHED", "Đơn hàng chưa đạt giá trị tối thiểu", null));
+            issues.add(issue("MIN_ORDER_NOT_REACHED", "Don hang chua dat gia tri toi thieu", null));
         }
 
         return CartValidationResponse.builder()
@@ -427,7 +430,7 @@ public class CartService {
         }
     }
 
-    private CartResponse mapCartResponse(Cart cart) {
+    private CartResponse mapCartResponse(Cart cart, String userId) {
         List<CartItem> items = cartItemRepository.findByCartIdOrderByCreatedAtAsc(cart.getId());
         List<String> cartItemIds = items.stream().map(CartItem::getId).collect(Collectors.toList());
 
@@ -471,6 +474,13 @@ public class CartService {
                 : optionGroupRepository.findAllById(optionGroupIds).stream()
                 .collect(Collectors.toMap(OptionGroup::getId, Function.identity()));
 
+        BigDecimal subtotal = items.stream()
+                .map(item -> safeLineTotal(item.getUnitPrice(), item.getQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        VoucherCartPricingResponse cartPricing = voucherService.getAvailableForCart(userId, cart.getStoreId());
+        BigDecimal totalDiscount = amount(cartPricing.getTotalDiscount());
+
         List<CartResponse.CartItemResponse> itemResponses = items.stream()
                 .map(item -> mapCartItemResponse(
                         item,
@@ -478,14 +488,12 @@ public class CartService {
                         combosById,
                         optionMap.getOrDefault(item.getId(), Collections.emptyList()),
                         optionItemsById,
-                        optionGroupsById
+                        optionGroupsById,
+                        subtotal,
+                        totalDiscount
                 ))
                 .collect(Collectors.toList());
 
-        BigDecimal subtotal = itemResponses.stream()
-                .map(CartResponse.CartItemResponse::getTotalPrice)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
         int totalItems = itemResponses.stream()
                 .map(CartResponse.CartItemResponse::getQuantity)
                 .filter(Objects::nonNull)
@@ -502,6 +510,10 @@ public class CartService {
                 .isStoreOpen(store != null && Boolean.TRUE.equals(store.getIsOpen()) && Boolean.TRUE.equals(store.getIsActive()))
                 .totalItems(totalItems)
                 .subtotal(scaleAmount(subtotal))
+                .totalVoucherDiscount(scaleAmount(totalDiscount))
+                .subtotalAfterVoucher(scaleAmount(subtotal.subtract(totalDiscount).max(BigDecimal.ZERO)))
+                .bestPlatformVoucher(cartPricing.getAppliedPlatformVoucher())
+                .bestStoreVoucher(cartPricing.getAppliedStoreVoucher())
                 .updatedAt(cart.getUpdatedAt())
                 .items(itemResponses)
                 .build();
@@ -513,7 +525,9 @@ public class CartService {
             Map<String, Combo> combosById,
             List<CartItemOption> cartOptions,
             Map<String, OptionItem> optionItemsById,
-            Map<String, OptionGroup> optionGroupsById
+            Map<String, OptionGroup> optionGroupsById,
+            BigDecimal cartSubtotal,
+            BigDecimal totalDiscount
     ) {
         String itemName = null;
         String imageUrl = null;
@@ -532,6 +546,8 @@ public class CartService {
         }
 
         BigDecimal lineTotal = safeLineTotal(cartItem.getUnitPrice(), cartItem.getQuantity());
+        BigDecimal lineDiscount = proportionalDiscount(lineTotal, cartSubtotal, totalDiscount);
+
         List<CartResponse.CartItemOptionResponse> optionResponses = cartOptions.stream()
                 .map(cartOption -> {
                     OptionItem optionItem = optionItemsById.get(cartOption.getOptionItemId());
@@ -552,6 +568,11 @@ public class CartService {
                 })
                 .collect(Collectors.toList());
 
+        BigDecimal discountedLineTotal = lineTotal.subtract(lineDiscount).max(BigDecimal.ZERO);
+        BigDecimal discountedUnitPrice = cartItem.getQuantity() != null && cartItem.getQuantity() > 0
+                ? discountedLineTotal.divide(BigDecimal.valueOf(cartItem.getQuantity()), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
         return CartResponse.CartItemResponse.builder()
                 .id(cartItem.getId())
                 .menuItemId(cartItem.getMenuItemId())
@@ -561,6 +582,8 @@ public class CartService {
                 .quantity(cartItem.getQuantity())
                 .unitPrice(scaleAmount(defaultAmount(cartItem.getUnitPrice())))
                 .totalPrice(scaleAmount(lineTotal))
+                .discountedUnitPrice(scaleAmount(discountedUnitPrice))
+                .discountedTotalPrice(scaleAmount(discountedLineTotal))
                 .specialInstructions(cartItem.getSpecialInstructions())
                 .options(optionResponses)
                 .build();
@@ -573,6 +596,8 @@ public class CartService {
                 .isStoreOpen(false)
                 .totalItems(0)
                 .subtotal(BigDecimal.ZERO)
+                .subtotalAfterVoucher(BigDecimal.ZERO)
+                .totalVoucherDiscount(BigDecimal.ZERO)
                 .items(Collections.emptyList())
                 .build();
     }
@@ -589,6 +614,22 @@ public class CartService {
         BigDecimal safeUnitPrice = defaultAmount(unitPrice);
         int safeQuantity = quantity != null && quantity > 0 ? quantity : 0;
         return safeUnitPrice.multiply(BigDecimal.valueOf(safeQuantity));
+    }
+
+    private BigDecimal proportionalDiscount(BigDecimal lineTotal, BigDecimal subtotal, BigDecimal totalDiscount) {
+        if (subtotal.compareTo(BigDecimal.ZERO) <= 0 || totalDiscount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal ratio = lineTotal.divide(subtotal, 8, RoundingMode.HALF_UP);
+        BigDecimal discount = totalDiscount.multiply(ratio);
+        if (discount.compareTo(lineTotal) > 0) {
+            return lineTotal;
+        }
+        return scaleAmount(discount);
+    }
+
+    private BigDecimal amount(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private BigDecimal defaultAmount(BigDecimal amount) {

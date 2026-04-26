@@ -12,5 +12,7 @@ public interface CartRepository extends JpaRepository<Cart, String> {
 
     Optional<Cart> findFirstByUserIdOrderByUpdatedAtDesc(String userId);
 
+    Optional<Cart> findByUserIdAndStoreId(String userId, String storeId);
+
     List<Cart> findByUserIdOrderByUpdatedAtDesc(String userId);
 }

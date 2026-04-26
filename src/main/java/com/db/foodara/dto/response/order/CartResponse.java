@@ -1,5 +1,6 @@
 package com.db.foodara.dto.response.order;
 
+import com.db.foodara.dto.response.promotion.VoucherPricingResponse;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
@@ -23,6 +24,10 @@ public class CartResponse {
     private Boolean isStoreOpen;
     private Integer totalItems;
     private BigDecimal subtotal;
+    private BigDecimal subtotalAfterVoucher;
+    private BigDecimal totalVoucherDiscount;
+    private VoucherPricingResponse bestPlatformVoucher;
+    private VoucherPricingResponse bestStoreVoucher;
     private LocalDateTime updatedAt;
     private List<CartItemResponse> items;
 
@@ -41,6 +46,8 @@ public class CartResponse {
         private Integer quantity;
         private BigDecimal unitPrice;
         private BigDecimal totalPrice;
+        private BigDecimal discountedUnitPrice;
+        private BigDecimal discountedTotalPrice;
         private String specialInstructions;
         private List<CartItemOptionResponse> options;
     }
