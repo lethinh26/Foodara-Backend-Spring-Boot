@@ -1,5 +1,6 @@
 package com.db.foodara.dto.response.store;
 
+import com.db.foodara.dto.response.promotion.VoucherPricingResponse;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
@@ -21,6 +22,9 @@ public class MenuItemResponse {
     private String description;
     private String imageUrl;
     private BigDecimal basePrice;
+    private BigDecimal discountedPrice;
+    private BigDecimal estimatedDiscountAmount;
+    private VoucherPricingResponse bestVoucher;
     private Boolean isAvailable;
     private Boolean isActive;
     private Boolean isPopular;

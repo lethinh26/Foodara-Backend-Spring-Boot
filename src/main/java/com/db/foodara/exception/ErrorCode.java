@@ -97,7 +97,13 @@ public enum ErrorCode {
     CART_INVALID_REQUEST(1902, "Cart request is invalid"),
     CART_INVALID_OPTION(1903, "Cart item options are invalid"),
     CART_ITEM_UNAVAILABLE(1904, "Cart item is unavailable"),
-    CART_STORE_MISMATCH(1905, "Cart item does not belong to selected store")
+    CART_STORE_MISMATCH(1905, "Cart item does not belong to selected store"),
+
+    // voucher
+    VOUCHER_NOT_FOUND(2000, "Voucher not found"),
+    VOUCHER_NOT_ACTIVE(2001, "Voucher is not active"),
+    VOUCHER_NOT_ELIGIBLE(2002, "Voucher is not eligible for this order"),
+    VOUCHER_OUT_OF_STOCK(2003, "Voucher has run out")
 
     ;
     private int code;

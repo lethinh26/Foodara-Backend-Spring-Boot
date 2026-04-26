@@ -4,6 +4,7 @@ import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.response.store.*;
 import com.db.foodara.service.store.StoreService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,14 +36,14 @@ public class StoreController {
 
     // C07: GET /v1/stores/:id/menu-items
     @GetMapping("/{id}/menu-items")
-    public ApiResponse<List<MenuItemResponse>> getMenuItems(@PathVariable String id) {
-        return ApiResponse.success(storeService.getMenuItems(id));
+    public ApiResponse<List<MenuItemResponse>> getMenuItems(@PathVariable String id, Authentication authentication) {
+        return ApiResponse.success(storeService.getMenuItems(id, authentication != null ? authentication.getName() : null));
     }
 
     // GET /v1/stores/:id/menu-items-detail - includes option groups
     @GetMapping("/{id}/menu-items-detail")
-    public ApiResponse<List<MenuItemDetailResponse>> getMenuItemsWithOptions(@PathVariable String id) {
-        return ApiResponse.success(storeService.getMenuItemsWithOptions(id));
+    public ApiResponse<List<MenuItemDetailResponse>> getMenuItemsWithOptions(@PathVariable String id, Authentication authentication) {
+        return ApiResponse.success(storeService.getMenuItemsWithOptions(id, authentication != null ? authentication.getName() : null));
     }
 
     // C06: GET /v1/stores/:id/operating-hours
