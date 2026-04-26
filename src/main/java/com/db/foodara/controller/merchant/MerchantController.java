@@ -107,7 +107,7 @@ public class MerchantController {
         return ApiResponse.success("Operating hours updated");
     }
 
-https://github.com/lethinh26/Foodara-Backend-Spring-Boot/pull/10/conflict?name=src%252Fmain%252Fjava%252Fcom%252Fdb%252Ffoodara%252Fcontroller%252Fmerchant%252FMerchantController.java&base_oid=7185a5be423b49e8ac95dcb80f352d512f1e01a1&head_oid=7e8c54b9906d72be5a6b12f18cb7e4c37bfaeca5    @GetMapping("/bank-accounts")
+    @GetMapping("/bank-accounts")
     @PreAuthorize("hasRole('MERCHANT')")
     public ApiResponse<List<BankAccountResponse>> getBankAccounts(Authentication authentication) {
         String userId = authentication.getName();

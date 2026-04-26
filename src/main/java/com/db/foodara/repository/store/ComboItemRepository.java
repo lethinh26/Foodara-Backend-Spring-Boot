@@ -12,5 +12,7 @@ public interface ComboItemRepository extends JpaRepository<ComboItem, String> {
 
     List<ComboItem> findByComboId(String comboId);
 
+    List<ComboItem> findByComboIdIn(List<String> comboIds);
+
     void removeByComboId(String comboId);
 }

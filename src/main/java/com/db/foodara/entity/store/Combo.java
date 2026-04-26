@@ -35,6 +35,9 @@ public class Combo{
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
     @Column(name = "starts_at")
     private LocalDateTime startsAt;
 
@@ -52,6 +55,7 @@ public class Combo{
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (isActive == null) isActive = true;
+        if (displayOrder == null) displayOrder = 0;
     }
 
     @PreUpdate

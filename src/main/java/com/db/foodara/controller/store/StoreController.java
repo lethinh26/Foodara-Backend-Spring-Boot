@@ -21,6 +21,12 @@ public class StoreController {
         return ApiResponse.success(storeService.getStoreById(id));
     }
 
+    // C06: GET /v1/stores/:id/menu - docs alias for menu categories
+    @GetMapping("/{id}/menu")
+    public ApiResponse<List<MenuCategoryResponse>> getMenu(@PathVariable String id) {
+        return ApiResponse.success(storeService.getMenu(id));
+    }
+
     // C07: GET /v1/stores/:id/menu-categories
     @GetMapping("/{id}/menu-categories")
     public ApiResponse<List<MenuCategoryResponse>> getMenuCategories(@PathVariable String id) {
@@ -37,6 +43,18 @@ public class StoreController {
     @GetMapping("/{id}/menu-items-detail")
     public ApiResponse<List<MenuItemDetailResponse>> getMenuItemsWithOptions(@PathVariable String id) {
         return ApiResponse.success(storeService.getMenuItemsWithOptions(id));
+    }
+
+    // C06: GET /v1/stores/:id/operating-hours
+    @GetMapping("/{id}/operating-hours")
+    public ApiResponse<List<OperatingHourResponse>> getOperatingHours(@PathVariable String id) {
+        return ApiResponse.success(storeService.getOperatingHours(id));
+    }
+
+    // C06: GET /v1/stores/:id/combos
+    @GetMapping("/{id}/combos")
+    public ApiResponse<List<ComboResponse>> getCombos(@PathVariable String id) {
+        return ApiResponse.success(storeService.getCombos(id));
     }
 
     // C13: GET /v1/stores/:id/reviews
