@@ -5,6 +5,7 @@ import com.db.foodara.dto.response.user.AddressResponse;
 import com.db.foodara.dto.response.user.UserProfileResponse;
 import com.db.foodara.dto.request.user.AddressRequest;
 import com.db.foodara.dto.request.user.UpdateProfileRequest;
+import com.db.foodara.dto.response.user.UserCheckMerchantResponse;
 import com.db.foodara.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -68,5 +69,10 @@ public class UserController {
     @PutMapping("/me/addresses/{id}/default")
     public ApiResponse<AddressResponse> setDefaultAddress(Authentication authentication, @PathVariable String id) {
         return ApiResponse.success(userService.setDefaultAddress(authentication.getName(), id));
+    }
+
+    @GetMapping("/check-merchant/{email}/{password}")
+    public ApiResponse<UserCheckMerchantResponse> getUserCheckMerchant(@PathVariable String email, @PathVariable String password){
+        return ApiResponse.success(userService.getUserCheckMerchant(email, password));
     }
 }
