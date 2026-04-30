@@ -1,11 +1,14 @@
 package com.db.foodara.controller.auth;
 
+import com.db.foodara.dto.request.user.UserRoleRequest;
 import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.response.auth.SessionResponse;
 import com.db.foodara.dto.response.auth.TokenResponse;
 import com.db.foodara.dto.request.auth.*;
+import com.db.foodara.entity.user.UserRole;
 import com.db.foodara.service.auth.AuthService;
 import com.db.foodara.service.auth.IpLocationService;
+import com.db.foodara.service.user.UserRoleService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,6 +27,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final IpLocationService ipLocationService;
+    private final UserRoleService userRoleService;
 
     @Value("${app.jwt.refresh-token-expiration-ms:2592000000}")
     private long refreshTokenExpirationMs;
@@ -168,5 +172,11 @@ public class AuthController {
         cookie.setSecure(Boolean.parseBoolean(System.getenv("IS_PRODUCTION")));
         cookie.setMaxAge(0);
         response.addCookie(cookie);
+    }
+
+    @PostMapping("/user-role")
+    private ApiResponse<UserRole> saveUserRole(@RequestBody UserRoleRequest userRole){
+        // userid name-role
+        return ApiResponse.success(userRoleService.addUserRole(userRole));
     }
 }

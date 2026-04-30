@@ -75,6 +75,9 @@ public class MerchantService {
         merchant.setCoverImageUrl(request.getCoverImageUrl());
         merchant.setApprovalStatus("pending");
 
+        UserRole userRole = new UserRole();
+        userRole.setUserId(merchant.getId());
+
         Merchant saved = merchantRepository.save(merchant);
         return mapToMerchantProfileResponse(saved);
     }
