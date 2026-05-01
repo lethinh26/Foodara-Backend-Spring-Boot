@@ -11,7 +11,15 @@ public class VoucherApplyRequest {
     @NotBlank(message = "Store ID is required")
     private String storeId;
 
+    // Platform discount voucher (percentage/fixed type)
     private String platformVoucherId;
+    private String platformCode;
 
+    // Platform freeship voucher
+    private String platformShipVoucherId;
+    private String platformShipCode;
+
+    // Store voucher
     private String storeVoucherId;
+    private String storeCode;
 }

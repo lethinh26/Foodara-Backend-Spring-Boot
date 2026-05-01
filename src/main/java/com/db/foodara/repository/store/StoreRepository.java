@@ -21,8 +21,8 @@ public interface StoreRepository extends JpaRepository<Store, String>, JpaSpecif
     List<Store> findByIsActiveTrueAndIsOpenTrue();
 
     @Query("SELECT s FROM Store s WHERE s.isActive = true AND s.isOpen = true " +
-           "AND s.serviceZoneId = :zoneId")
-    List<Store> findActiveStoresByZone(@Param("zoneId") String zoneId);
+           "AND s.cityName = :cityName")
+    List<Store> findActiveStoresByCity(@Param("cityName") String cityName);
 
     @Query("SELECT s FROM Store s WHERE s.isActive = true AND s.isOpen = true " +
            "ORDER BY s.avgRating DESC")

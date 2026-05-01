@@ -4,8 +4,10 @@ import com.db.foodara.dto.request.user.UserRoleRequest;
 import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.response.auth.SessionResponse;
 import com.db.foodara.dto.response.auth.TokenResponse;
+import com.db.foodara.dto.response.auth.RegisterCheckResponse;
 import com.db.foodara.dto.request.auth.*;
-import com.db.foodara.entity.user.UserRole;
+import com.db.foodara.exception.AppException;
+import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.service.auth.AuthService;
 import com.db.foodara.service.auth.IpLocationService;
 import com.db.foodara.service.user.UserRoleService;
@@ -16,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,15 +40,41 @@ public class AuthController {
 
     // POST /api/auth/register
     @PostMapping("/register")
-    public ApiResponse<TokenResponse> register(@RequestBody @Valid RegisterRequest request, HttpServletResponse response) {
-        TokenResponse tokenResponse = authService.register(request);
+    public ApiResponse<TokenResponse> register(
+            @RequestBody @Valid RegisterRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response) {
+        String xForwardedFor = httpRequest.getHeader("X-Forwarded-For");
+        String remoteAddr = httpRequest.getRemoteAddr();
+        String ipAddress = ipLocationService.extractIpFromRequest(xForwardedFor, remoteAddr);
+        String userAgent = httpRequest.getHeader("User-Agent");
+
+        TokenResponse tokenResponse = authService.register(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
         return ApiResponse.success("Registration successful",
-            TokenResponse.builder()
-                .accessToken(tokenResponse.getAccessToken())
-                .tokenType(tokenResponse.getTokenType())
-                .expiresIn(tokenResponse.getExpiresIn())
-                .build());
+toPublicToken(tokenResponse));
+    }
+
+    @PostMapping("/register/check")
+    public ApiResponse<RegisterCheckResponse> checkRegister(
+            @RequestBody @Valid RegisterRequest request,
+            @RequestParam(defaultValue = "CUSTOMER") String role) {
+        return ApiResponse.success(authService.checkRegister(request, role));
+    }
+
+    @PostMapping("/link-role")
+    public ApiResponse<TokenResponse> linkRole(
+            @RequestBody @Valid LinkRoleRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response) {
+        String xForwardedFor = httpRequest.getHeader("X-Forwarded-For");
+        String remoteAddr = httpRequest.getRemoteAddr();
+        String ipAddress = ipLocationService.extractIpFromRequest(xForwardedFor, remoteAddr);
+        String userAgent = httpRequest.getHeader("User-Agent");
+
+        TokenResponse tokenResponse = authService.linkRole(request, ipAddress, userAgent);
+        setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
+        return ApiResponse.success("Role linked successfully", toPublicToken(tokenResponse));
     }
 
     // POST /api/auth/login
@@ -64,11 +93,7 @@ public class AuthController {
         TokenResponse tokenResponse = authService.login(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
         return ApiResponse.success("Login successful",
-            TokenResponse.builder()
-                .accessToken(tokenResponse.getAccessToken())
-                .tokenType(tokenResponse.getTokenType())
-                .expiresIn(tokenResponse.getExpiresIn())
-                .build());
+toPublicToken(tokenResponse));
     }
 
     // POST /api/auth/logout
@@ -85,9 +110,12 @@ public class AuthController {
     // POST /api/auth/refresh-token
     @PostMapping("/refresh-token")
     public ApiResponse<TokenResponse> refreshToken(
-        @CookieValue(value = "refreshToken", required = true) String refreshToken,
+        @CookieValue(value = "refreshToken", required = false) String refreshToken,
         HttpServletResponse response
     ) {
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
         RefreshTokenRequest request = new RefreshTokenRequest();
         request.setRefreshToken(refreshToken);
         TokenResponse tokenResponse = authService.refreshToken(request);
@@ -95,11 +123,7 @@ public class AuthController {
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
 
         return ApiResponse.success(
-            TokenResponse.builder()
-                .accessToken(tokenResponse.getAccessToken())
-                .tokenType(tokenResponse.getTokenType())
-                .expiresIn(tokenResponse.getExpiresIn())
-                .build());
+toPublicToken(tokenResponse));
     }
 
     // POST /api/auth/verify-email
@@ -155,12 +179,21 @@ public class AuthController {
         return ApiResponse.success("Session deleted");
     }
 
+
+    private TokenResponse toPublicToken(TokenResponse tokenResponse) {
+        return TokenResponse.builder()
+                .accessToken(tokenResponse.getAccessToken())
+                .tokenType(tokenResponse.getTokenType())
+                .expiresIn(tokenResponse.getExpiresIn())
+                .build();
+    }
+
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
         Cookie cookie = new Cookie("refreshToken", refreshToken);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setMaxAge((int) (refreshTokenExpirationMs / 1000));
-        cookie.setSecure(Boolean.parseBoolean(System.getenv("IS_PRODUCTION")));
+        cookie.setSecure(isProduction);
 
         response.addCookie(cookie);
     }
@@ -169,14 +202,8 @@ public class AuthController {
         Cookie cookie = new Cookie("refreshToken", null);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
-        cookie.setSecure(Boolean.parseBoolean(System.getenv("IS_PRODUCTION")));
+        cookie.setSecure(isProduction);
         cookie.setMaxAge(0);
         response.addCookie(cookie);
-    }
-
-    @PostMapping("/user-role")
-    private ApiResponse<UserRole> saveUserRole(@RequestBody UserRoleRequest userRole){
-        // userid name-role
-        return ApiResponse.success(userRoleService.addUserRole(userRole));
     }
 }

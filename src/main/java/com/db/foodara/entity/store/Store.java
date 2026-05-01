@@ -38,11 +38,11 @@ public class Store {
     @Column(name = "ward")
     private String ward;
 
-    @Column(name = "district_id")
-    private String districtId;
+    @Column(name = "district_name")
+    private String districtName;
 
-    @Column(name = "city_id")
-    private String cityId;
+    @Column(name = "city_name")
+    private String cityName;
 
     @Column(name = "latitude")
     private BigDecimal latitude;
@@ -50,8 +50,7 @@ public class Store {
     @Column(name = "longitude")
     private BigDecimal longitude;
 
-    @Column(name = "service_zone_id")
-    private String serviceZoneId;
+
 
     @Column(name = "is_open")
     private Boolean isOpen;

@@ -14,9 +14,8 @@ public class StoreResponse {
     private String slug;
     private String addressLine;
     private String ward;
-    private String districtId;
-    private String city_id;
+    private String districtName;
+    private String cityName;
     private String latitude;
     private String longitude;
-    private String serviceZone;
 }

@@ -20,12 +20,11 @@ public class StoreUpdateRequest {
 
     private String addressLine;
     private String ward;
-    private String districtId;
-    private String cityId;
+    private String districtName;
+    private String cityName;
 
     private BigDecimal latitude;
     private BigDecimal longitude;
-    private String serviceZoneId;
 
     private Boolean autoAcceptOrders;
     private Integer avgPreparationTime;

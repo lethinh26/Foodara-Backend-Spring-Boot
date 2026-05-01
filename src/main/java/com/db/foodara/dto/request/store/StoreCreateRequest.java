@@ -22,12 +22,10 @@ public class StoreCreateRequest {
     private String ward;
 
     @NotBlank(message = "DISTRICT_REQUIRED")
-    private String districtId;
+    private String districtName;
 
     @NotBlank(message = "CITY_REQUIRED")
-    private String city_id;
+    private String cityName;
     private String latitude;
     private String longitude;
-
-    private String serviceZone; // Có thể để trống tùy nghiệp vụ
 }

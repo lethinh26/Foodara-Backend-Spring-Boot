@@ -131,6 +131,7 @@ public class VoucherService {
                 cart.getStoreId(),
                 subtotal,
                 bestChoice.getPlatformVoucher(),
+                null,
                 bestChoice.getStoreVoucher(),
                 bestChoice,
                 mapAvailableVouchers(eligible, subtotal, userId)
@@ -145,20 +146,49 @@ public class VoucherService {
         BigDecimal subtotal = calculateCartSubtotal(cart);
         List<Voucher> eligible = getEligibleCollectedVouchers(userId, request.getStoreId(), subtotal, LocalDateTime.now());
         Map<String, Voucher> eligibleById = eligible.stream().collect(Collectors.toMap(Voucher::getId, Function.identity()));
+        Map<String, Voucher> eligibleByCode = toEligibleByCode(eligible);
 
-        Voucher platform = resolveAppliedVoucher(request.getPlatformVoucherId(), "platform", eligibleById);
-        Voucher store = resolveAppliedVoucher(request.getStoreVoucherId(), "store", eligibleById);
+        Voucher platform = resolveAppliedVoucher(
+                request.getPlatformVoucherId(),
+                request.getPlatformCode(),
+                "platform",
+                eligibleById,
+                eligibleByCode
+        );
+        Voucher platformShip = resolveAppliedVoucher(
+                request.getPlatformShipVoucherId(),
+                request.getPlatformShipCode(),
+                "platform",
+                eligibleById,
+                eligibleByCode
+        );
+        Voucher store = resolveAppliedVoucher(
+                request.getStoreVoucherId(),
+                request.getStoreCode(),
+                "store",
+                eligibleById,
+                eligibleByCode
+        );
 
-        if (platform != null && store != null
-                && (!Boolean.TRUE.equals(platform.getIsStackable()) || !Boolean.TRUE.equals(store.getIsStackable()))) {
+        // Validate: platform discount voucher must NOT be free_ship type
+        if (platform != null && "free_ship".equalsIgnoreCase(platform.getDiscountType())) {
             throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
         }
+        // Validate: platform ship voucher must BE free_ship type
+        if (platformShip != null && !"free_ship".equalsIgnoreCase(platformShip.getDiscountType())) {
+            throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
+        }
+
+        // Validate stackability for each pair
+        validateStackablePair(platform, store);
+        validateStackablePair(platformShip, store);
 
         VoucherBestChoiceResponse bestChoice = calculateBestChoice(eligible, subtotal);
         return buildPricingResponse(
                 cart.getStoreId(),
                 subtotal,
                 toPricingResponse(platform, subtotal),
+                toPricingResponse(platformShip, subtotal),
                 toPricingResponse(store, subtotal),
                 bestChoice,
                 mapAvailableVouchers(eligible, subtotal, userId)
@@ -172,15 +202,49 @@ public class VoucherService {
 
         BigDecimal subtotal = calculateCartSubtotal(cart);
         List<Voucher> eligible = getEligibleCollectedVouchers(userId, request.getStoreId(), subtotal, LocalDateTime.now());
+        Map<String, Voucher> eligibleById = eligible.stream().collect(Collectors.toMap(Voucher::getId, Function.identity()));
+        Map<String, Voucher> eligibleByCode = toEligibleByCode(eligible);
         VoucherBestChoiceResponse bestChoice = calculateBestChoice(eligible, subtotal);
 
-        VoucherPricingResponse selectedPlatform = request.isRemovePlatform() ? null : bestChoice.getPlatformVoucher();
-        VoucherPricingResponse selectedStore = request.isRemoveStore() ? null : bestChoice.getStoreVoucher();
+        Voucher selectedPlatformVoucher = resolveAppliedVoucher(
+                request.getPlatformVoucherId(),
+                request.getPlatformCode(),
+                "platform",
+                eligibleById,
+                eligibleByCode
+        );
+        Voucher selectedStoreVoucher = resolveAppliedVoucher(
+                request.getStoreVoucherId(),
+                request.getStoreCode(),
+                "store",
+                eligibleById,
+                eligibleByCode
+        );
+
+        RemovalType removalType = resolveRemovalType(request);
+        if (removalType.removePlatform()) {
+            selectedPlatformVoucher = null;
+        }
+        if (removalType.removeStore()) {
+            selectedStoreVoucher = null;
+        }
+
+        if (!removalType.removePlatform() && selectedPlatformVoucher == null) {
+            selectedPlatformVoucher = resolvePricingVoucher(bestChoice.getPlatformVoucher(), eligibleById);
+        }
+        if (!removalType.removeStore() && selectedStoreVoucher == null) {
+            selectedStoreVoucher = resolvePricingVoucher(bestChoice.getStoreVoucher(), eligibleById);
+        }
+        validateStackablePair(selectedPlatformVoucher, selectedStoreVoucher);
+
+        VoucherPricingResponse selectedPlatform = toPricingResponse(selectedPlatformVoucher, subtotal);
+        VoucherPricingResponse selectedStore = toPricingResponse(selectedStoreVoucher, subtotal);
 
         return buildPricingResponse(
                 cart.getStoreId(),
                 subtotal,
                 selectedPlatform,
+                null,
                 selectedStore,
                 bestChoice,
                 mapAvailableVouchers(eligible, subtotal, userId)
@@ -191,11 +255,13 @@ public class VoucherService {
             String storeId,
             BigDecimal subtotal,
             VoucherPricingResponse appliedPlatform,
+            VoucherPricingResponse appliedPlatformShip,
             VoucherPricingResponse appliedStore,
             VoucherBestChoiceResponse bestChoice,
             List<VoucherResponse> available
     ) {
         BigDecimal totalDiscount = normalizeAmount(appliedPlatform != null ? appliedPlatform.getPotentialDiscount() : BigDecimal.ZERO)
+                .add(normalizeAmount(appliedPlatformShip != null ? appliedPlatformShip.getPotentialDiscount() : BigDecimal.ZERO))
                 .add(normalizeAmount(appliedStore != null ? appliedStore.getPotentialDiscount() : BigDecimal.ZERO));
         if (totalDiscount.compareTo(subtotal) > 0) {
             totalDiscount = subtotal;
@@ -207,6 +273,7 @@ public class VoucherService {
                 .totalDiscount(scale(totalDiscount))
                 .subtotalAfterVoucher(scale(subtotal.subtract(totalDiscount).max(BigDecimal.ZERO)))
                 .appliedPlatformVoucher(appliedPlatform)
+                .appliedPlatformShipVoucher(appliedPlatformShip)
                 .appliedStoreVoucher(appliedStore)
                 .bestPlatformVoucher(bestChoice.getPlatformVoucher())
                 .bestStoreVoucher(bestChoice.getStoreVoucher())
@@ -226,30 +293,51 @@ public class VoucherService {
     }
 
     private VoucherBestChoiceResponse calculateBestChoice(List<Voucher> candidates, BigDecimal subtotal) {
-        VoucherPricingResponse bestPlatform = candidates.stream()
-                .filter(v -> "platform".equalsIgnoreCase(v.getVoucherType()))
-                .map(v -> toPricingResponse(v, subtotal))
-                .filter(Objects::nonNull)
-                .max(Comparator.comparing(VoucherPricingResponse::getPotentialDiscount, Comparator.nullsLast(BigDecimal::compareTo)))
-                .orElse(null);
+        VoucherCandidate bestPlatform = findBestCandidate(candidates, "platform", subtotal);
+        VoucherCandidate bestStore = findBestCandidate(candidates, "store", subtotal);
 
-        VoucherPricingResponse bestStore = candidates.stream()
-                .filter(v -> "store".equalsIgnoreCase(v.getVoucherType()))
-                .map(v -> toPricingResponse(v, subtotal))
-                .filter(Objects::nonNull)
-                .max(Comparator.comparing(VoucherPricingResponse::getPotentialDiscount, Comparator.nullsLast(BigDecimal::compareTo)))
-                .orElse(null);
+        BigDecimal platformOnlyDiscount = discountOf(bestPlatform);
+        BigDecimal storeOnlyDiscount = discountOf(bestStore);
+        boolean canStackPair = isStackablePair(
+                bestPlatform != null ? bestPlatform.voucher() : null,
+                bestStore != null ? bestStore.voucher() : null
+        );
+        BigDecimal stackedDiscount = canStackPair
+                ? platformOnlyDiscount.add(storeOnlyDiscount)
+                : BigDecimal.valueOf(-1);
 
-        BigDecimal totalDiscount = normalizeAmount(bestPlatform != null ? bestPlatform.getPotentialDiscount() : BigDecimal.ZERO)
-                .add(normalizeAmount(bestStore != null ? bestStore.getPotentialDiscount() : BigDecimal.ZERO));
-        if (totalDiscount.compareTo(subtotal) > 0) {
-            totalDiscount = subtotal;
+        VoucherCandidate selectedPlatform;
+        VoucherCandidate selectedStore;
+        BigDecimal selectedDiscount;
+
+        if (canStackPair
+                && stackedDiscount.compareTo(platformOnlyDiscount) >= 0
+                && stackedDiscount.compareTo(storeOnlyDiscount) >= 0) {
+            selectedPlatform = bestPlatform;
+            selectedStore = bestStore;
+            selectedDiscount = stackedDiscount;
+        } else if (platformOnlyDiscount.compareTo(storeOnlyDiscount) >= 0 && platformOnlyDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            selectedPlatform = bestPlatform;
+            selectedStore = null;
+            selectedDiscount = platformOnlyDiscount;
+        } else if (storeOnlyDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            selectedPlatform = null;
+            selectedStore = bestStore;
+            selectedDiscount = storeOnlyDiscount;
+        } else {
+            selectedPlatform = null;
+            selectedStore = null;
+            selectedDiscount = BigDecimal.ZERO;
+        }
+
+        if (selectedDiscount.compareTo(subtotal) > 0) {
+            selectedDiscount = subtotal;
         }
 
         return VoucherBestChoiceResponse.builder()
-                .platformVoucher(bestPlatform)
-                .storeVoucher(bestStore)
-                .totalDiscount(scale(totalDiscount))
+                .platformVoucher(selectedPlatform != null ? selectedPlatform.pricing() : null)
+                .storeVoucher(selectedStore != null ? selectedStore.pricing() : null)
+                .totalDiscount(scale(selectedDiscount))
                 .build();
     }
 
@@ -266,15 +354,103 @@ public class VoucherService {
                 .collect(Collectors.toList());
     }
 
-    private Voucher resolveAppliedVoucher(String voucherId, String expectedType, Map<String, Voucher> eligibleById) {
-        if (!StringUtils.hasText(voucherId)) {
-            return null;
+    private Voucher resolveAppliedVoucher(
+            String voucherId,
+            String voucherCode,
+            String expectedType,
+            Map<String, Voucher> eligibleById,
+            Map<String, Voucher> eligibleByCode
+    ) {
+        Voucher byCode = null;
+        if (StringUtils.hasText(voucherCode)) {
+            byCode = eligibleByCode.get(voucherCode.trim().toUpperCase(Locale.ROOT));
+            if (byCode == null) {
+                throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
+            }
         }
-        Voucher voucher = eligibleById.get(voucherId);
-        if (voucher == null || !expectedType.equalsIgnoreCase(voucher.getVoucherType())) {
+
+        Voucher byId = null;
+        if (StringUtils.hasText(voucherId)) {
+            byId = eligibleById.get(voucherId.trim());
+            if (byId == null) {
+                throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
+            }
+        }
+
+        Voucher selected = byCode != null ? byCode : byId;
+        if (byCode != null && byId != null && !Objects.equals(byCode.getId(), byId.getId())) {
             throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
         }
-        return voucher;
+        if (selected != null && !expectedType.equalsIgnoreCase(selected.getVoucherType())) {
+            throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
+        }
+        return selected;
+    }
+
+    private Map<String, Voucher> toEligibleByCode(List<Voucher> eligible) {
+        return eligible.stream()
+                .filter(voucher -> StringUtils.hasText(voucher.getCode()))
+                .collect(Collectors.toMap(
+                        voucher -> voucher.getCode().trim().toUpperCase(Locale.ROOT),
+                        Function.identity(),
+                        (existing, ignored) -> existing
+                ));
+    }
+
+    private VoucherCandidate findBestCandidate(List<Voucher> candidates, String voucherType, BigDecimal subtotal) {
+        return candidates.stream()
+                .filter(voucher -> voucherType.equalsIgnoreCase(voucher.getVoucherType()))
+                .map(voucher -> new VoucherCandidate(voucher, toPricingResponse(voucher, subtotal)))
+                .filter(candidate -> candidate.pricing() != null)
+                .max(Comparator.comparing(
+                        candidate -> normalizeAmount(candidate.pricing().getPotentialDiscount()),
+                        BigDecimal::compareTo
+                ))
+                .orElse(null);
+    }
+
+    private BigDecimal discountOf(VoucherCandidate candidate) {
+        if (candidate == null || candidate.pricing() == null) {
+            return BigDecimal.ZERO;
+        }
+        return normalizeAmount(candidate.pricing().getPotentialDiscount());
+    }
+
+    private void validateStackablePair(Voucher platform, Voucher store) {
+        if (!isStackablePair(platform, store)) {
+            throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
+        }
+    }
+
+    private boolean isStackablePair(Voucher platform, Voucher store) {
+        // Cross-scope (store + platform) is always allowed.
+        // UI enforces 1 voucher per scope, so no same-scope conflict is possible.
+        return true;
+    }
+
+    private Voucher resolvePricingVoucher(VoucherPricingResponse pricingResponse, Map<String, Voucher> eligibleById) {
+        if (pricingResponse == null || !StringUtils.hasText(pricingResponse.getVoucherId())) {
+            return null;
+        }
+        return eligibleById.get(pricingResponse.getVoucherId());
+    }
+
+    private RemovalType resolveRemovalType(VoucherRemoveRequest request) {
+        if (StringUtils.hasText(request.getType())) {
+            String normalized = request.getType().trim().toLowerCase(Locale.ROOT);
+            return switch (normalized) {
+                case "platform" -> new RemovalType(true, false);
+                case "store" -> new RemovalType(false, true);
+                case "all" -> new RemovalType(true, true);
+                default -> throw new AppException(ErrorCode.VOUCHER_NOT_ELIGIBLE);
+            };
+        }
+
+        if (request.isRemovePlatform() || request.isRemoveStore()) {
+            return new RemovalType(request.isRemovePlatform(), request.isRemoveStore());
+        }
+
+        return new RemovalType(true, true);
     }
 
     private BigDecimal calculateCartSubtotal(Cart cart) {
@@ -434,5 +610,11 @@ public class VoucherService {
             return null;
         }
         return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private record VoucherCandidate(Voucher voucher, VoucherPricingResponse pricing) {
+    }
+
+    private record RemovalType(boolean removePlatform, boolean removeStore) {
     }
 }
