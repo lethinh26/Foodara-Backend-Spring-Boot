@@ -1,5 +1,6 @@
 package com.db.foodara.controller.auth;
 
+import com.db.foodara.dto.request.user.UserRoleRequest;
 import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.response.auth.SessionResponse;
 import com.db.foodara.dto.response.auth.TokenResponse;
@@ -9,6 +10,7 @@ import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.service.auth.AuthService;
 import com.db.foodara.service.auth.IpLocationService;
+import com.db.foodara.service.user.UserRoleService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,6 +30,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final IpLocationService ipLocationService;
+    private final UserRoleService userRoleService;
 
     @Value("${app.jwt.refresh-token-expiration-ms:2592000000}")
     private long refreshTokenExpirationMs;

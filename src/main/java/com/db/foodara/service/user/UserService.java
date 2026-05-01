@@ -5,6 +5,8 @@ import com.db.foodara.dto.response.user.UserProfileResponse;
 import com.db.foodara.dto.request.user.AddressRequest;
 import com.db.foodara.dto.request.user.UpdateProfileRequest;
 
+import com.db.foodara.dto.response.user.UserCheckMerchantResponse;
+import com.db.foodara.entity.role.Role;
 import com.db.foodara.entity.user.User;
 import com.db.foodara.entity.user.UserAddress;
 import com.db.foodara.exception.AppException;
@@ -12,7 +14,9 @@ import com.db.foodara.exception.ErrorCode;
 
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
+import com.db.foodara.repository.user.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -163,5 +167,23 @@ public class UserService {
                 .isDefault(Boolean.TRUE.equals(a.getIsDefault()))
                 .createdAt(a.getCreatedAt())
                 .build();
+    }
+
+    public UserCheckMerchantResponse getUserCheckMerchant(String email, String password){
+        // lay user qua email
+        // kiem tra password
+        // check co phai merchant chua
+
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (passwordEncoder.matches(password, user.getPasswordHash())) {
+            Role merchantRole = roleRepository.findByName("merchant")
+                    .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+
+            boolean hasMerchantRole = userRoleRepository.findByUserId(user.getId()).stream()
+                    .anyMatch(ur -> ur.getRoleId().equals(merchantRole.getId()));
+
+            return new UserCheckMerchantResponse(user.getId(), user.getEmail(), user.getFullName(), hasMerchantRole, user.getAvatarUrl());
+        }
+        return null;
     }
 }
