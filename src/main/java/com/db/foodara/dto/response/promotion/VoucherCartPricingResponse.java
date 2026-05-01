@@ -20,6 +20,7 @@ public class VoucherCartPricingResponse {
     private BigDecimal subtotalAfterVoucher;
 
     private VoucherPricingResponse appliedPlatformVoucher;
+    private VoucherPricingResponse appliedPlatformShipVoucher;
     private VoucherPricingResponse appliedStoreVoucher;
 
     private VoucherPricingResponse bestPlatformVoucher;

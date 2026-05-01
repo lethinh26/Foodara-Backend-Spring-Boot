@@ -71,16 +71,36 @@ public class CartService {
                 normalizeOptionIds(request.getOptionItemIds())
         );
 
-        CartItem cartItem = new CartItem();
-        cartItem.setCart(cart);
-        cartItem.setMenuItemId(selection.menuItem != null ? selection.menuItem.getId() : null);
-        cartItem.setComboId(selection.combo != null ? selection.combo.getId() : null);
-        cartItem.setQuantity(request.getQuantity());
-        cartItem.setUnitPrice(selection.unitPrice);
-        cartItem.setSpecialInstructions(request.getSpecialInstructions());
-        cartItem = cartItemRepository.save(cartItem);
+        // Check for existing item to stack: same menuItem/combo + same options + same note
+        List<String> sortedNewOptionIds = normalizeOptionIds(request.getOptionItemIds()).stream()
+                .sorted()
+                .collect(Collectors.toList());
+        String newNote = request.getSpecialInstructions() != null ? request.getSpecialInstructions().trim() : "";
 
-        saveCartItemOptions(cartItem, selection.selectedOptions);
+        CartItem existingItem = findMatchingCartItem(
+                cart.getId(),
+                request.getMenuItemId(),
+                request.getComboId(),
+                sortedNewOptionIds,
+                newNote
+        );
+
+        if (existingItem != null) {
+            existingItem.setQuantity(existingItem.getQuantity() + request.getQuantity());
+            existingItem.setUnitPrice(selection.unitPrice);
+            cartItemRepository.save(existingItem);
+        } else {
+            CartItem cartItem = new CartItem();
+            cartItem.setCart(cart);
+            cartItem.setMenuItemId(selection.menuItem != null ? selection.menuItem.getId() : null);
+            cartItem.setComboId(selection.combo != null ? selection.combo.getId() : null);
+            cartItem.setQuantity(request.getQuantity());
+            cartItem.setUnitPrice(selection.unitPrice);
+            cartItem.setSpecialInstructions(request.getSpecialInstructions());
+            cartItem = cartItemRepository.save(cartItem);
+            saveCartItemOptions(cartItem, selection.selectedOptions);
+        }
+
         touchCart(cart);
         return mapCartResponse(cart, userId);
     }
@@ -272,6 +292,36 @@ public class CartService {
         cart.setUserId(userId);
         cart.setStoreId(storeId);
         return cartRepository.save(cart);
+    }
+
+    private CartItem findMatchingCartItem(
+            String cartId,
+            String menuItemId,
+            String comboId,
+            List<String> sortedNewOptionIds,
+            String newNote
+    ) {
+        List<CartItem> existingItems = cartItemRepository.findByCartIdOrderByCreatedAtAsc(cartId);
+        for (CartItem item : existingItems) {
+            // Match menuItemId or comboId
+            if (!Objects.equals(item.getMenuItemId(), menuItemId)) continue;
+            if (!Objects.equals(item.getComboId(), comboId)) continue;
+
+            // Match special instructions
+            String existingNote = item.getSpecialInstructions() != null ? item.getSpecialInstructions().trim() : "";
+            if (!existingNote.equals(newNote)) continue;
+
+            // Match sorted option IDs
+            List<String> existingOptionIds = cartItemOptionRepository
+                    .findByCartItemIdOrderByCreatedAtAsc(item.getId()).stream()
+                    .map(CartItemOption::getOptionItemId)
+                    .sorted()
+                    .collect(Collectors.toList());
+            if (existingOptionIds.equals(sortedNewOptionIds)) {
+                return item;
+            }
+        }
+        return null;
     }
 
     private void touchCart(Cart cart) {

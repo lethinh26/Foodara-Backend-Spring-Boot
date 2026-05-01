@@ -3,6 +3,7 @@ package com.db.foodara.exception;
 import com.db.foodara.dto.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -46,6 +47,14 @@ public class GlobalExceptionHandler {
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(errorCode.getMessage());
 
+        return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = MissingRequestCookieException.class)
+    ResponseEntity<ApiResponse<Void>> handleMissingRequestCookie(MissingRequestCookieException exception) {
+        ApiResponse<Void> apiResponse = new ApiResponse<>();
+        apiResponse.setCode(ErrorCode.INVALID_TOKEN.getCode());
+        apiResponse.setMessage(ErrorCode.INVALID_TOKEN.getMessage());
         return ResponseEntity.badRequest().body(apiResponse);
     }
 }

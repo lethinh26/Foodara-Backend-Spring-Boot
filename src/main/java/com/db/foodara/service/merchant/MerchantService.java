@@ -52,6 +52,8 @@ public class MerchantService {
             throw new AppException(ErrorCode.MERCHANT_ALREADY_EXISTS);
         }
 
+        // nếu user tồn tại
+
         Role merchantRole = roleRepository.findByName("MERCHANT")
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
 
@@ -157,11 +159,10 @@ public class MerchantService {
         store.setPhone(request.getPhone());
         store.setAddressLine(request.getAddressLine());
         store.setWard(request.getWard());
-        store.setDistrictId(request.getDistrictId());
-        store.setCityId(request.getCityId());
+        store.setDistrictName(request.getDistrictName());
+        store.setCityName(request.getCityName());
         store.setLatitude(request.getLatitude());
         store.setLongitude(request.getLongitude());
-        store.setServiceZoneId(request.getServiceZoneId());
         store.setAutoAcceptOrders(request.getAutoAcceptOrders() != null ? request.getAutoAcceptOrders() : false);
         store.setAvgPreparationTime(request.getAvgPreparationTime() != null ? request.getAvgPreparationTime() : 15);
         store.setMinOrderAmount(request.getMinOrderAmount() != null ? request.getMinOrderAmount() : java.math.BigDecimal.ZERO);
@@ -208,11 +209,10 @@ public class MerchantService {
         if (request.getPhone() != null) store.setPhone(request.getPhone());
         if (request.getAddressLine() != null) store.setAddressLine(request.getAddressLine());
         if (request.getWard() != null) store.setWard(request.getWard());
-        if (request.getDistrictId() != null) store.setDistrictId(request.getDistrictId());
-        if (request.getCityId() != null) store.setCityId(request.getCityId());
+        if (request.getDistrictName() != null) store.setDistrictName(request.getDistrictName());
+        if (request.getCityName() != null) store.setCityName(request.getCityName());
         if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
         if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
-        if (request.getServiceZoneId() != null) store.setServiceZoneId(request.getServiceZoneId());
         if (request.getAutoAcceptOrders() != null) store.setAutoAcceptOrders(request.getAutoAcceptOrders());
         if (request.getAvgPreparationTime() != null) store.setAvgPreparationTime(request.getAvgPreparationTime());
         if (request.getMinOrderAmount() != null) store.setMinOrderAmount(request.getMinOrderAmount());
@@ -363,11 +363,10 @@ public class MerchantService {
                 .phone(s.getPhone())
                 .addressLine(s.getAddressLine())
                 .ward(s.getWard())
-                .districtId(s.getDistrictId())
-                .cityId(s.getCityId())
+                .districtName(s.getDistrictName())
+                .cityName(s.getCityName())
                 .latitude(s.getLatitude())
                 .longitude(s.getLongitude())
-                .serviceZoneId(s.getServiceZoneId())
                 .isOpen(s.getIsOpen())
                 .isActive(s.getIsActive())
                 .autoAcceptOrders(s.getAutoAcceptOrders())

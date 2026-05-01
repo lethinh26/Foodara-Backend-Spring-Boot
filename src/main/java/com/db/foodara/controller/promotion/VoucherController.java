@@ -6,7 +6,10 @@ import com.db.foodara.dto.response.ApiResponse;
 import com.db.foodara.dto.response.promotion.VoucherBestChoiceResponse;
 import com.db.foodara.dto.response.promotion.VoucherCartPricingResponse;
 import com.db.foodara.dto.response.promotion.VoucherResponse;
+import com.db.foodara.exception.AppException;
+import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.service.promotion.VoucherService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -37,23 +40,23 @@ public class VoucherController {
             Authentication authentication,
             @RequestParam String storeId
     ) {
-        return ApiResponse.success(voucherService.getAvailableForCart(authentication.getName(), storeId));
+        return ApiResponse.success(voucherService.getAvailableForCart(requireUserId(authentication), storeId));
     }
 
     @PostMapping("/vouchers/apply")
     public ApiResponse<VoucherCartPricingResponse> applyVouchers(
             Authentication authentication,
-            @RequestBody VoucherApplyRequest request
+            @Valid @RequestBody VoucherApplyRequest request
     ) {
-        return ApiResponse.success(voucherService.applyVouchersForCart(authentication.getName(), request));
+        return ApiResponse.success(voucherService.applyVouchersForCart(requireUserId(authentication), request));
     }
 
     @PostMapping("/vouchers/remove")
     public ApiResponse<VoucherCartPricingResponse> removeVouchers(
             Authentication authentication,
-            @RequestBody VoucherRemoveRequest request
+            @Valid @RequestBody VoucherRemoveRequest request
     ) {
-        return ApiResponse.success(voucherService.removeVouchersForCart(authentication.getName(), request));
+        return ApiResponse.success(voucherService.removeVouchersForCart(requireUserId(authentication), request));
     }
 
     @GetMapping("/vouchers/my-vouchers")
@@ -62,7 +65,7 @@ public class VoucherController {
             @RequestParam(required = false) String storeId,
             @RequestParam(required = false) BigDecimal subtotal
     ) {
-        return ApiResponse.success(voucherService.getMyVouchers(authentication.getName(), storeId, subtotal));
+        return ApiResponse.success(voucherService.getMyVouchers(requireUserId(authentication), storeId, subtotal));
     }
 
     @PostMapping("/vouchers/{id}/collect")
@@ -70,7 +73,7 @@ public class VoucherController {
             Authentication authentication,
             @PathVariable("id") String voucherId
     ) {
-        return ApiResponse.success(voucherService.collectVoucher(authentication.getName(), voucherId));
+        return ApiResponse.success(voucherService.collectVoucher(requireUserId(authentication), voucherId));
     }
 
     @GetMapping("/vouchers/best")
@@ -79,6 +82,13 @@ public class VoucherController {
             @RequestParam String storeId,
             @RequestParam BigDecimal subtotal
     ) {
-        return ApiResponse.success(voucherService.getBestVoucherForStore(authentication.getName(), storeId, subtotal));
+        return ApiResponse.success(voucherService.getBestVoucherForStore(requireUserId(authentication), storeId, subtotal));
+    }
+
+    private String requireUserId(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return authentication.getName();
     }
 }

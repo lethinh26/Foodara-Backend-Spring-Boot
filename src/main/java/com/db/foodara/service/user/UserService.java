@@ -9,8 +9,7 @@ import com.db.foodara.entity.user.User;
 import com.db.foodara.entity.user.UserAddress;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
-import com.db.foodara.repository.location.CityRepository;
-import com.db.foodara.repository.location.DistrictRepository;
+
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +25,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserAddressRepository userAddressRepository;
-    private final CityRepository cityRepository;
-    private final DistrictRepository districtRepository;
+
 
     // ============================================================
     // Profile
@@ -114,8 +112,8 @@ public class UserService {
         address.setRecipientPhone(request.getRecipientPhone());
         address.setAddressLine(request.getAddressLine());
         address.setWard(request.getWard());
-        address.setDistrictId(request.getDistrictId());
-        address.setCityId(request.getCityId());
+        address.setDistrictName(request.getDistrictName());
+        address.setCityName(request.getCityName());
         address.setLatitude(request.getLatitude());
         address.setLongitude(request.getLongitude());
         address.setDeliveryNote(request.getDeliveryNote());
@@ -157,8 +155,8 @@ public class UserService {
                 .recipientPhone(a.getRecipientPhone())
                 .addressLine(a.getAddressLine())
                 .ward(a.getWard())
-                .districtId(a.getDistrictId())
-                .cityId(a.getCityId())
+                .districtName(a.getDistrictName())
+                .cityName(a.getCityName())
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
                 .deliveryNote(a.getDeliveryNote())

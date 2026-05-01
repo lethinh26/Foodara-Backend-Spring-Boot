@@ -3,6 +3,7 @@ package com.db.foodara.service.auth;
 import com.db.foodara.dto.response.auth.IpLocationResponse;
 import com.db.foodara.dto.response.auth.SessionResponse;
 import com.db.foodara.dto.response.auth.TokenResponse;
+import com.db.foodara.dto.response.auth.RegisterCheckResponse;
 import com.db.foodara.dto.request.auth.*;
 import com.db.foodara.entity.role.Role;
 import com.db.foodara.entity.user.User;
@@ -22,9 +23,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -44,8 +47,72 @@ public class AuthService {
     @Value("${app.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
 
+    @Value("${app.jwt.refresh-token-expiration-ms}")
+    private long refreshTokenExpirationMs;
+
+
+    @Transactional(readOnly = true)
+    public RegisterCheckResponse checkRegister(RegisterRequest request, String targetRole) {
+        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        if (user == null) {
+            return RegisterCheckResponse.builder()
+                    .exists(false)
+                    .passwordMatched(false)
+                    .canLinkRole(false)
+                    .targetRole(normalizeRole(targetRole))
+                    .roles(List.of())
+                    .build();
+        }
+
+        boolean passwordMatched = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
+        List<String> roles = getUserRoles(user.getId());
+        String normalizedRole = normalizeRole(targetRole);
+        boolean canLinkRole = passwordMatched
+                && isLinkableRole(normalizedRole)
+                && !roles.contains(normalizedRole)
+                && roles.stream().allMatch(this::isLinkableRole);
+
+        return RegisterCheckResponse.builder()
+                .exists(true)
+                .passwordMatched(passwordMatched)
+                .canLinkRole(canLinkRole)
+                .targetRole(normalizedRole)
+                .roles(roles)
+                .build();
+    }
+
     @Transactional
-    public TokenResponse register(RegisterRequest request) {
+    public TokenResponse linkRole(LinkRoleRequest request, String ipAddress, String userAgent) {
+        User user = userRepository.findByEmail(request.getUsername())
+                .orElseGet(() -> userRepository.findByPhone(request.getUsername())
+                        .orElseThrow(() -> new AppException(ErrorCode.INVALID_LOGIN)));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new AppException(ErrorCode.WRONG_PASSWORD);
+        }
+        if ("suspended".equals(user.getStatus())) {
+            throw new AppException(ErrorCode.ACCOUNT_SUSPENDED);
+        }
+
+        String roleName = normalizeRole(request.getRole());
+        if (!isLinkableRole(roleName)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
+        if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), role.getId())) {
+            UserRole userRole = new UserRole();
+            userRole.setUserId(user.getId());
+            userRole.setRoleId(role.getId());
+            userRoleRepository.save(userRole);
+        }
+
+        return issueTokens(user, ipAddress, userAgent);
+    }
+
+    @Transactional
+    public TokenResponse register(RegisterRequest request, String ipAddress, String userAgent) {
         if (request.getPhone() != null && userRepository.existsByPhone(request.getPhone())) {
             throw new AppException(ErrorCode.PHONE_EXISTS);
         }
@@ -72,11 +139,7 @@ public class AuthService {
             userRoleRepository.save(userRole);
         }
 
-        List<String> roles = getUserRoles(user.getId());
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), roles);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
-
-        return TokenResponse.of(accessToken, refreshToken, accessTokenExpirationMs);
+        return issueTokens(user, ipAddress, userAgent);
     }
 
     @Transactional
@@ -95,30 +158,22 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        List<String> roles = getUserRoles(user.getId());
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), roles);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        TokenResponse tokenResponse = issueTokens(user, ipAddress, userAgent);
 
         IpLocationResponse locationInfo = ipLocationService.getLocationByIp(ipAddress);
-
-        UserSession session = new UserSession();
-        session.setUserId(user.getId());
-        session.setTokenHash(refreshToken);
-        session.setIpAddress(ipAddress);
-        session.setUserAgent(userAgent);
-        session.setExpiresAt(LocalDateTime.now().plusDays(30));
-
-        userSessionRepository.save(session);
 
         log.info("User logged in: userId={}, ip={}, location={}, {}",
             user.getId(), ipAddress, locationInfo.getCity(), locationInfo.getCountry());
 
-        return TokenResponse.of(accessToken, refreshToken, accessTokenExpirationMs);
+        return tokenResponse;
     }
 
     @Transactional
     public void logout(String userId, String refreshToken) {
-        userSessionRepository.findByTokenHash(refreshToken)
+        if (!StringUtils.hasText(refreshToken)) {
+            return;
+        }
+        userSessionRepository.findByTokenHashAndUserId(refreshToken, userId)
                 .ifPresent(userSessionRepository::delete);
     }
 
@@ -126,13 +181,15 @@ public class AuthService {
     public TokenResponse refreshToken(RefreshTokenRequest request) {
         String refreshToken = request.getRefreshToken();
 
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
+        if (!StringUtils.hasText(refreshToken)
+                || !jwtTokenProvider.validateToken(refreshToken)
+                || !jwtTokenProvider.isRefreshToken(refreshToken)) {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
         String userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
 
-        UserSession session = userSessionRepository.findByTokenHash(refreshToken)
+        UserSession session = userSessionRepository.findByTokenHashAndUserId(refreshToken, userId)
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
 
         if (session.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -148,6 +205,7 @@ public class AuthService {
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(userId);
 
         session.setTokenHash(newRefreshToken);
+        session.setExpiresAt(calculateRefreshTokenExpiry());
         userSessionRepository.save(session);
 
         return TokenResponse.of(newAccessToken, newRefreshToken, accessTokenExpirationMs);
@@ -186,6 +244,38 @@ public class AuthService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         userSessionRepository.delete(session);
+    }
+
+
+    private TokenResponse issueTokens(User user, String ipAddress, String userAgent) {
+        List<String> roles = getUserRoles(user.getId());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), roles);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        createSession(user.getId(), refreshToken, ipAddress, userAgent);
+        return TokenResponse.of(accessToken, refreshToken, accessTokenExpirationMs);
+    }
+
+    private String normalizeRole(String role) {
+        return role == null ? "CUSTOMER" : role.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private boolean isLinkableRole(String role) {
+        return "CUSTOMER".equals(role) || "MERCHANT".equals(role);
+    }
+
+    private void createSession(String userId, String refreshToken, String ipAddress, String userAgent) {
+        UserSession session = new UserSession();
+        session.setUserId(userId);
+        session.setTokenHash(refreshToken);
+        session.setIpAddress(ipAddress);
+        session.setUserAgent(userAgent);
+        session.setExpiresAt(calculateRefreshTokenExpiry());
+        userSessionRepository.save(session);
+    }
+
+    private LocalDateTime calculateRefreshTokenExpiry() {
+        long expirySeconds = Math.max(1L, refreshTokenExpirationMs / 1000L);
+        return LocalDateTime.now().plusSeconds(expirySeconds);
     }
 
     private List<String> getUserRoles(String userId) {

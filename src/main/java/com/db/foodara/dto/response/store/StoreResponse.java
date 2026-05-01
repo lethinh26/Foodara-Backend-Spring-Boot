@@ -21,11 +21,10 @@ public class StoreResponse {
     private String phone;
     private String addressLine;
     private String ward;
-    private String districtId;
-    private String cityId;
+    private String districtName;
+    private String cityName;
     private BigDecimal latitude;
     private BigDecimal longitude;
-    private String serviceZoneId;
     private Boolean isOpen;
     private Boolean isActive;
     private Boolean autoAcceptOrders;

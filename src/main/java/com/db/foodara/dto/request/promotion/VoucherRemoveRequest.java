@@ -11,11 +11,20 @@ public class VoucherRemoveRequest {
     @NotBlank(message = "Store ID is required")
     private String storeId;
 
-    private String platformVoucherId;
+    // API contract: "platform" | "store" | "all"(optional)
+    private String type;
 
+    // Current selected vouchers (optional), prioritized by code
+    private String platformCode;
+    private String storeCode;
+
+    // Backward compatibility for existing clients
+    private String platformVoucherId;
     private String storeVoucherId;
 
-    private boolean removePlatform = true;
+    @Deprecated
+    private boolean removePlatform;
 
-    private boolean removeStore = true;
+    @Deprecated
+    private boolean removeStore;
 }

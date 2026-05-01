@@ -33,9 +33,11 @@ public class UserAddress {
     @Column(length = 100)
     private String ward;
 
-    private String districtId;
+    @Column(name = "district_name", length = 100)
+    private String districtName;
 
-    private String cityId;
+    @Column(name = "city_name", length = 100)
+    private String cityName;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitude;

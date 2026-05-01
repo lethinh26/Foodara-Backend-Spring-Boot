@@ -1,7 +1,6 @@
 package com.db.foodara.security;
 
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -36,6 +35,7 @@ public class JwtTokenProvider {
                 .subject(userId)
                 .claim("email", email)
                 .claim("roles", roles)
+                .claim("type", "access")
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
@@ -58,6 +58,20 @@ public class JwtTokenProvider {
 
     public String getUserIdFromToken(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    public String getTokenType(String token) {
+        Object tokenType = parseClaims(token).get("type");
+        return tokenType == null ? null : tokenType.toString();
+    }
+
+    public boolean isRefreshToken(String token) {
+        return "refresh".equalsIgnoreCase(getTokenType(token));
+    }
+
+    public boolean isAccessToken(String token) {
+        String tokenType = getTokenType(token);
+        return tokenType == null || tokenType.isBlank() || "access".equalsIgnoreCase(tokenType);
     }
 
     @SuppressWarnings("unchecked")
