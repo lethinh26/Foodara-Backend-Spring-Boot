@@ -12,6 +12,7 @@ import com.db.foodara.entity.user.UserRole;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.merchant.*;
+import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.role.RoleRepository;
 import com.db.foodara.repository.user.UserRoleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ public class MerchantService {
     private MerchantRepository merchantRepository;
 
     @Autowired
-    private MerchantStoreRepository storeRepository;
+    private StoreRepository storeRepository;
 
     @Autowired
     private StoreDocumentRepository storeDocumentRepository;
@@ -73,6 +74,9 @@ public class MerchantService {
         merchant.setLogoUrl(request.getLogoUrl());
         merchant.setCoverImageUrl(request.getCoverImageUrl());
         merchant.setApprovalStatus("pending");
+
+        UserRole userRole = new UserRole();
+        userRole.setUserId(merchant.getId());
 
         Merchant saved = merchantRepository.save(merchant);
         return mapToMerchantProfileResponse(saved);
