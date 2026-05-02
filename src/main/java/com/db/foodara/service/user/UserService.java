@@ -12,6 +12,7 @@ import com.db.foodara.entity.user.UserAddress;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 
+import com.db.foodara.repository.role.RoleRepository;
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
 import com.db.foodara.repository.user.UserRoleRepository;
@@ -29,6 +30,9 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserAddressRepository userAddressRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
 
     // ============================================================
@@ -176,7 +180,7 @@ public class UserService {
 
         User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         if (passwordEncoder.matches(password, user.getPasswordHash())) {
-            Role merchantRole = roleRepository.findByName("merchant")
+            Role merchantRole = roleRepository.findByNameIgnoreCase("merchant")
                     .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
 
             boolean hasMerchantRole = userRoleRepository.findByUserId(user.getId()).stream()
