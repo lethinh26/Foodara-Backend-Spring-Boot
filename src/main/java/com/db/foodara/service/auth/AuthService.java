@@ -99,7 +99,7 @@ public class AuthService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
-        Role role = roleRepository.findByName(roleName)
+        Role role = roleRepository.findByNameIgnoreCase(roleName)
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
         if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), role.getId())) {
             UserRole userRole = new UserRole();
@@ -131,7 +131,7 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        var customerRole = roleRepository.findByName("CUSTOMER").orElse(null);
+        var customerRole = roleRepository.findByNameIgnoreCase("CUSTOMER").orElse(null);
         if (customerRole != null) {
             UserRole userRole = new UserRole();
             userRole.setUserId(user.getId());
@@ -281,7 +281,7 @@ public class AuthService {
     private List<String> getUserRoles(String userId) {
         return userRoleRepository.findByUserId(userId).stream()
                 .map(ur -> roleRepository.findById(ur.getRoleId())
-                        .map(Role::getName)
+                        .map(r -> r.getName().toUpperCase(Locale.ROOT))
                         .orElse("CUSTOMER"))
                 .collect(Collectors.toList());
     }

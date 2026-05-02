@@ -54,7 +54,7 @@ public class MerchantService {
 
         // nếu user tồn tại
 
-        Role merchantRole = roleRepository.findByName("MERCHANT")
+        Role merchantRole = roleRepository.findByNameIgnoreCase("MERCHANT")
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
 
         boolean hasMerchantRole = userRoleRepository.findByUserId(userId).stream()
