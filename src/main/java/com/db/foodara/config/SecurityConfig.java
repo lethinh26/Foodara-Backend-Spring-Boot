@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/home/**", "/v1/search/**", "/v1/stores/**", "/v1/menu-items/**", "/v1/locations/**", "/v1/store-categories/**").permitAll()
                         .requestMatchers("/v1/merchant/login", "/v1/merchant/register").permitAll()
                         .requestMatchers("/v1/merchant/**").hasRole("MERCHANT")
+                        .requestMatchers("/v1/users/check-merchant/**", "/v1/auth/user-role").permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated()

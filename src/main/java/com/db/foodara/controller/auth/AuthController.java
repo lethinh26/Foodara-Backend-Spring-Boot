@@ -6,6 +6,7 @@ import com.db.foodara.dto.response.auth.SessionResponse;
 import com.db.foodara.dto.response.auth.TokenResponse;
 import com.db.foodara.dto.response.auth.RegisterCheckResponse;
 import com.db.foodara.dto.request.auth.*;
+import com.db.foodara.entity.user.UserRole;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.service.auth.AuthService;
@@ -205,5 +206,11 @@ toPublicToken(tokenResponse));
         cookie.setSecure(isProduction);
         cookie.setMaxAge(0);
         response.addCookie(cookie);
+    }
+
+    @PostMapping("/user-role")
+    private ApiResponse<UserRole> saveUserRole(@RequestBody UserRoleRequest userRole){
+        // userid name-role
+        return ApiResponse.success(userRoleService.addUserRole(userRole));
     }
 }
