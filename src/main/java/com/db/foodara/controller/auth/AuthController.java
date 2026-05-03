@@ -36,6 +36,9 @@ public class AuthController {
     @Value("${app.jwt.refresh-token-expiration-ms:2592000000}")
     private long refreshTokenExpirationMs;
 
+    @Value("${app.jwt.access-token-expiration-ms:3600000}")
+    private long accessTokenExpirationMs;
+
     @Value("${IS_PRODUCTION:false}")
     private boolean isProduction;
 
@@ -52,8 +55,8 @@ public class AuthController {
 
         TokenResponse tokenResponse = authService.register(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
-        return ApiResponse.success("Registration successful",
-toPublicToken(tokenResponse));
+        setAccessTokenCookie(response, tokenResponse.getAccessToken());
+        return ApiResponse.success("Registration successful", toSafeToken(tokenResponse));
     }
 
     @PostMapping("/register/check")
@@ -75,7 +78,8 @@ toPublicToken(tokenResponse));
 
         TokenResponse tokenResponse = authService.linkRole(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
-        return ApiResponse.success("Role linked successfully", toPublicToken(tokenResponse));
+        setAccessTokenCookie(response, tokenResponse.getAccessToken());
+        return ApiResponse.success("Role linked successfully", toSafeToken(tokenResponse));
     }
 
     // POST /api/auth/login
@@ -93,8 +97,8 @@ toPublicToken(tokenResponse));
 
         TokenResponse tokenResponse = authService.login(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
-        return ApiResponse.success("Login successful",
-toPublicToken(tokenResponse));
+        setAccessTokenCookie(response, tokenResponse.getAccessToken());
+        return ApiResponse.success("Login successful", toSafeToken(tokenResponse));
     }
 
     // POST /api/auth/logout
@@ -105,6 +109,7 @@ toPublicToken(tokenResponse));
         String userId = authentication.getName();
         authService.logout(userId, refreshToken);
         clearRefreshTokenCookie(response);
+        clearAccessTokenCookie(response);
         return ApiResponse.success("Logout successful");
     }
 
@@ -122,9 +127,9 @@ toPublicToken(tokenResponse));
         TokenResponse tokenResponse = authService.refreshToken(request);
 
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
+        setAccessTokenCookie(response, tokenResponse.getAccessToken());
 
-        return ApiResponse.success(
-toPublicToken(tokenResponse));
+        return ApiResponse.success(toSafeToken(tokenResponse));
     }
 
     // POST /api/auth/verify-email
@@ -181,12 +186,31 @@ toPublicToken(tokenResponse));
     }
 
 
-    private TokenResponse toPublicToken(TokenResponse tokenResponse) {
+    private TokenResponse toSafeToken(TokenResponse tokenResponse) {
         return TokenResponse.builder()
-                .accessToken(tokenResponse.getAccessToken())
                 .tokenType(tokenResponse.getTokenType())
                 .expiresIn(tokenResponse.getExpiresIn())
                 .build();
+    }
+
+    private void setAccessTokenCookie(HttpServletResponse response, String accessToken) {
+        Cookie cookie = new Cookie("accessToken", accessToken);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge((int) (accessTokenExpirationMs / 1000));
+        cookie.setSecure(isProduction);
+        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax");
+        response.addCookie(cookie);
+    }
+
+    private void clearAccessTokenCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie("accessToken", null);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setSecure(isProduction);
+        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
@@ -195,7 +219,7 @@ toPublicToken(tokenResponse));
         cookie.setPath("/");
         cookie.setMaxAge((int) (refreshTokenExpirationMs / 1000));
         cookie.setSecure(isProduction);
-
+        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax");
         response.addCookie(cookie);
     }
 
@@ -204,6 +228,7 @@ toPublicToken(tokenResponse));
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         cookie.setSecure(isProduction);
+        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax");
         cookie.setMaxAge(0);
         response.addCookie(cookie);
     }
