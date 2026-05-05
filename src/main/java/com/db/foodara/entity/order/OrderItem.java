@@ -3,6 +3,8 @@ package com.db.foodara.entity.order;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -25,10 +27,10 @@ public class OrderItem {
 
     @NotNull
     @Column(name = "menu_item_id")
-    private Long menuItemId;
+    private String menuItemId;
 
     @Column(name = "combo_id")
-    private Long comboId;
+    private String comboId;
 
     @NotBlank
     @Column(name = "item_name")
@@ -49,6 +51,7 @@ public class OrderItem {
     @Column(name = "total_price")
     private BigDecimal totalPrice;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "options_snapshot", columnDefinition = "jsonb")
     private String optionsSnapshot;
 

@@ -2,6 +2,8 @@ package com.db.foodara.entity.order;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -38,6 +40,7 @@ public class Order {
     @Column(name = "delivery_address_id")
     private String deliveryAddressId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "delivery_address_snapshot", columnDefinition = "jsonb")
     private String deliveryAddressSnapshot;
 
@@ -62,6 +65,12 @@ public class Order {
 
     @Column(name = "store_longitude")
     private BigDecimal storeLongitude;
+
+    @Transient
+    private String storeLogoUrl;
+
+    @Transient
+    private String storePhone;
 
     // Pricing
     @Column(name = "subtotal", precision = 12, scale = 2, nullable = false)

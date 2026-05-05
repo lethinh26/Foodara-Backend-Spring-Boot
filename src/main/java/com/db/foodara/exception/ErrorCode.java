@@ -103,7 +103,15 @@ public enum ErrorCode {
     VOUCHER_NOT_FOUND(2000, "Voucher not found"),
     VOUCHER_NOT_ACTIVE(2001, "Voucher is not active"),
     VOUCHER_NOT_ELIGIBLE(2002, "Voucher is not eligible for this order"),
-    VOUCHER_OUT_OF_STOCK(2003, "Voucher has run out")
+    VOUCHER_OUT_OF_STOCK(2003, "Voucher has run out"),
+
+    // payment
+    PAYMENT_FAILED(2100, "Payment processing failed"),
+    PAYMENT_INVALID(2101, "Invalid payment method"),
+
+    // order placement
+    ORDER_CANNOT_CANCEL(1802, "Order cannot be cancelled in current status"),
+    STORE_CLOSED(1803, "Store is currently closed")
 
     ;
     private int code;
