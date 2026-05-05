@@ -186,6 +186,7 @@ public class AuthController {
     }
 
 
+
     private TokenResponse toSafeToken(TokenResponse tokenResponse) {
         return TokenResponse.builder()
                 .tokenType(tokenResponse.getTokenType())
