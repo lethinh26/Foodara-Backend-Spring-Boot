@@ -2,6 +2,8 @@ package com.db.foodara.entity.order;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -21,7 +23,6 @@ public class OrderStatusHistory {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @NotBlank
     @Column(name = "from_status")
     private String fromStatus;
 
@@ -40,6 +41,7 @@ public class OrderStatusHistory {
     @Column(name = "note")
     private String note;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
 

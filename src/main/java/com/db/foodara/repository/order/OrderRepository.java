@@ -12,4 +12,12 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     Optional<Order> findById(String id);
     Optional<Order> findByIdAndStoreId(String id, String storeId);
     List<Order> findByStoreIdAndStatus(String storeId, String status);
+
+    // Customer-facing queries
+    List<Order> findByCustomerIdOrderByCreatedAtDesc(String customerId);
+    Optional<Order> findByIdAndCustomerId(String id, String customerId);
+    Optional<Order> findByOrderNumber(String orderNumber);
+
+    // Payment timeout: find orders pending payment past deadline
+    List<Order> findByPaymentStatusAndPlacedAtBefore(String paymentStatus, java.time.LocalDateTime cutoff);
 }
