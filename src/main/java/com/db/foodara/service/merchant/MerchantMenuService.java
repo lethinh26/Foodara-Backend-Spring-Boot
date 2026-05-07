@@ -58,9 +58,9 @@ public class MerchantMenuService {
         MenuCategory menuCategory = new MenuCategory();
 
         storeRepository.findStoreById(request.getStoreId()).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
-        menuCategoryRepository.findMenuCategoryByStoreIdAndName(request.getStoreId(), request.getName()).orElseThrow(
-                () -> new AppException(ErrorCode.MENU_CATEGORY_NAME_EXISTED)
-        );
+        if(menuCategoryRepository.findMenuCategoryByStoreIdAndName(request.getStoreId(), request.getName()).isPresent()){
+            throw new AppException(ErrorCode.MENU_CATEGORY_NAME_EXISTED);
+        }
 
         menuCategory.setStoreId(request.getStoreId());
         menuCategory.setName(request.getName());

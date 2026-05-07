@@ -53,4 +53,6 @@ public interface StoreRepository extends JpaRepository<Store, String>, JpaSpecif
     Optional<Store> findByIdAndMerchantId(String id, String merchantId);
 
     boolean existsByMerchantIdAndName(String merchantId, String name);
+
+    List<Store> getStoreByMerchantId(String merchantId);
 }

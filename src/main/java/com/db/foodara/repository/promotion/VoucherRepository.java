@@ -19,4 +19,10 @@ public interface VoucherRepository extends JpaRepository<Voucher, String> {
     List<Voucher> findAvailableByStore(@Param("storeId") String storeId,
                                        @Param("merchantId") String merchantId,
                                        @Param("now") LocalDateTime now);
+
+    List<Voucher> findByMerchantId(String merchantId);
+
+    boolean removeVoucherById(String id);
+
+    void deleteById(String id);
 }

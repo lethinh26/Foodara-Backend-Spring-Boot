@@ -103,9 +103,17 @@ public enum ErrorCode {
     VOUCHER_NOT_FOUND(2000, "Voucher not found"),
     VOUCHER_NOT_ACTIVE(2001, "Voucher is not active"),
     VOUCHER_NOT_ELIGIBLE(2002, "Voucher is not eligible for this order"),
-    VOUCHER_OUT_OF_STOCK(2003, "Voucher has run out")
+    VOUCHER_OUT_OF_STOCK(2003, "Voucher has run out"),
+    VOUCHER_INVALID(2004, "Voucher is invalid"),
+    VOUCHER_DISCOUNT_INVALID(2005, "Voucher discount is invalid" ),
+    VOUCHER_TIME_INVALID(2006, "Voucher time is invalid"),
 
-    ;
+    // campaign
+    CAMPAIGN_NOT_FOUND(2100, "Campaign not found"),
+
+    DATETIME_INVALID(3001, "Date time is invalid"),
+
+;
     private int code;
     private String message;
 

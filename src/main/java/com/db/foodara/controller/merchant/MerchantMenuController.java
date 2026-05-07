@@ -1,15 +1,23 @@
 package com.db.foodara.controller.merchant;
 
+import com.db.foodara.dto.request.home.CampaignRequest;
+import com.db.foodara.dto.request.promotion.VoucherRequest;
 import com.db.foodara.dto.request.store.*;
 import com.db.foodara.dto.response.ApiResponse;
+import com.db.foodara.dto.response.promotion.VoucherResponse;
 import com.db.foodara.dto.response.store.ComboResponse;
 import com.db.foodara.dto.response.store.MenuItemResponse;
 import com.db.foodara.dto.response.store.OptionGroupResponse;
 import com.db.foodara.dto.response.store.OptionItemResponse;
+import com.db.foodara.entity.home.Campaign;
+import com.db.foodara.entity.home.CampaignParticipant;
+import com.db.foodara.entity.promotion.Voucher;
 import com.db.foodara.entity.store.MenuCategory;
 import com.db.foodara.entity.store.MenuItem;
 import com.db.foodara.entity.store.OptionGroup;
+import com.db.foodara.service.home.HomeService;
 import com.db.foodara.service.merchant.MerchantMenuService;
+import com.db.foodara.service.promotion.VoucherService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -22,7 +30,13 @@ import java.util.List;
 public class MerchantMenuController {
 
     @Autowired
-    MerchantMenuService merchantMenuService;
+    private MerchantMenuService merchantMenuService;
+
+    @Autowired
+    private VoucherService voucherService;
+
+    @Autowired
+    private HomeService homeService;
 
     @GetMapping("/stores/{storeId}/menu-categories")
     public ApiResponse<List<MenuCategory>> getMenuCategoriesByStore(Authentication authentication, @PathVariable("storeId") String storeId) {
@@ -123,5 +137,47 @@ public class MerchantMenuController {
     @DeleteMapping("/combos/{id}")
     public ApiResponse<Boolean> removeCombo(Authentication authentication, @PathVariable String id) {
         return ApiResponse.success(merchantMenuService.removeCombo(authentication.getName(), id));
+    }
+
+    @GetMapping("/vouchers")
+    public ApiResponse<List<Voucher>> getVouchers(Authentication authentication){
+        String userId = authentication.getName();
+        return ApiResponse.success(voucherService.getVouchersByMerchant(userId));
+    }
+
+    @PostMapping("/vouchers/{storeId}")
+    public ApiResponse<Voucher> createVouchers(Authentication authentication,
+                                               @PathVariable String storeId,
+                                               @RequestBody VoucherRequest request){
+        String userId = authentication.getName();
+        return ApiResponse.success(voucherService.createVoucher(userId, storeId, request));
+    }
+
+    @PutMapping("/vouchers/{voucherId}")
+    public ApiResponse<Voucher> updateVouchers(Authentication authentication,
+                                               @PathVariable String voucherId,
+                                               @RequestBody VoucherRequest request){
+        String userId = authentication.getName();
+        return ApiResponse.success(voucherService.updateVoucher(userId, voucherId, request));
+    }
+
+    @DeleteMapping("/vouchers/{voucherId}")
+    public ApiResponse<Boolean> deleteVouchers(Authentication authentication,
+                                               @PathVariable String voucherId){
+        String userId = authentication.getName();
+        return ApiResponse.success(voucherService.deleteVouchers(userId, voucherId));
+    }
+
+    @PostMapping("/campaigns/join")
+    public ApiResponse<Boolean> storeJoinCampaign(Authentication authentication,
+                                                  @RequestBody CampaignParticipant request){
+        String userId = authentication.getName();
+        return ApiResponse.success(homeService.storeJoinCampaign(userId, request));
+    }
+
+    @GetMapping("/campaigns/join")
+    public ApiResponse<List<CampaignParticipant>> getCampaignJoined(Authentication authentication){
+        String userId = authentication.getName();
+        return ApiResponse.success(homeService.getCampaignParticipant(userId));
     }
 }

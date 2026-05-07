@@ -6,19 +6,27 @@ import com.db.foodara.dto.response.store.MenuItemResponse;
 import com.db.foodara.dto.response.store.StoreResponse;
 import com.db.foodara.entity.home.Banner;
 import com.db.foodara.entity.home.Campaign;
+import com.db.foodara.entity.home.CampaignParticipant;
+import com.db.foodara.entity.merchant.Merchant;
 import com.db.foodara.entity.store.MenuItem;
 import com.db.foodara.entity.store.Store;
+import com.db.foodara.exception.AppException;
+import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.home.BannerRepository;
+import com.db.foodara.repository.home.CampaignParticipantRepository;
 import com.db.foodara.repository.home.CampaignRepository;
+import com.db.foodara.repository.merchant.MerchantRepository;
 import com.db.foodara.repository.store.MenuItemRepository;
 import com.db.foodara.repository.store.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +39,8 @@ public class HomeService {
     private final CampaignRepository campaignRepository;
     private final StoreRepository storeRepository;
     private final MenuItemRepository menuItemRepository;
+    private final MerchantRepository merchantRepository;
+    private final CampaignParticipantRepository campaignParticipantRepository;
 
     // C04: GET /v1/home/banners
     public List<BannerResponse> getBanners() {
@@ -96,6 +106,34 @@ public class HomeService {
         return campaignRepository.findActiveCampaigns(now).stream()
                 .map(this::mapToCampaignResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Boolean storeJoinCampaign(String userId, CampaignParticipant request){
+        merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        storeRepository.findStoreById(request.getStoreId()).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+        Campaign campaign = campaignRepository.findById(request.getCampaignId()).orElseThrow(() -> new AppException(ErrorCode.CAMPAIGN_NOT_FOUND));
+
+        request.setJoinedAt(LocalDateTime.now());
+        request.setEndedAt(campaign.getEndsAt());
+        if(request.getEndedAt().isBefore(LocalDateTime.now())){
+            throw new AppException(ErrorCode.DATETIME_INVALID);
+        }
+
+        campaignParticipantRepository.save(request);
+        return true;
+    }
+
+    public List<CampaignParticipant> getCampaignParticipant(String userId){
+        Merchant merchant = merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        List<Store> stores = storeRepository.getStoreByMerchantId(merchant.getId());
+
+        List<CampaignParticipant> result = new ArrayList<>();
+        stores.forEach(s -> {
+            result.addAll(campaignParticipantRepository.getCampaignParticipantByStoreId(s.getId()));
+        });
+
+        return result;
     }
 
     // --- Private mapping methods ---

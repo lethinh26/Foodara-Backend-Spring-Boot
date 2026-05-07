@@ -76,7 +76,7 @@ public class MerchantController {
 
     @GetMapping("/stores/{id}")
     @PreAuthorize("hasRole('MERCHANT')")
-    public ApiResponse<StoreResponse> getStore(Authentication authentication, @PathVariable String id) {
+    public ApiResponse<StoreResponse> getStore(Authentication authentication, @PathVariable("id") String id) {
         String userId = authentication.getName();
         return ApiResponse.success(merchantService.getStore(userId, id));
     }
@@ -130,4 +130,6 @@ public class MerchantController {
         String userId = authentication.getName();
         return ApiResponse.success(merchantService.updateBankAccount(userId, id, request));
     }
+
+
 }

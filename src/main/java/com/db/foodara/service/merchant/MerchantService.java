@@ -182,10 +182,11 @@ public class MerchantService {
     public List<StoreResponse> getStores(String userId) {
         Merchant merchant = merchantRepository.findByOwnerId(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
-
-        return storeRepository.findByMerchantId(merchant.getId()).stream()
+        List<StoreResponse> list = storeRepository.findByMerchantId(merchant.getId()).stream()
                 .map(this::mapToStoreResponse)
                 .collect(Collectors.toList());
+
+        return list;
     }
 
     public StoreResponse getStore(String userId, String storeId) {
@@ -249,6 +250,7 @@ public class MerchantService {
                 .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
 
         storeOperatingHoursRepository.deleteByStoreId(storeId);
+        storeOperatingHoursRepository.flush();
 
         for (StoreOperatingHoursRequest request : requests) {
             StoreOperatingHours hours = new StoreOperatingHours();
