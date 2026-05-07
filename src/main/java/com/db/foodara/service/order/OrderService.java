@@ -43,7 +43,7 @@ public class OrderService {
         merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
         storeRepository.findStoreById(storeId).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
 
-        return orderRepository.findAll();
+        return orderRepository.findByStoreId((storeId)).orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
     }
 
     //115	GET	/api/merchant/orders/:id	Chi tiết đơn

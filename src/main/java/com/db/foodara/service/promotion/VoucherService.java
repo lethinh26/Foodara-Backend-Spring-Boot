@@ -1,11 +1,13 @@
 package com.db.foodara.service.promotion;
 
 import com.db.foodara.dto.request.promotion.VoucherApplyRequest;
+import com.db.foodara.dto.request.promotion.VoucherRequest;
 import com.db.foodara.dto.request.promotion.VoucherRemoveRequest;
 import com.db.foodara.dto.response.promotion.VoucherBestChoiceResponse;
 import com.db.foodara.dto.response.promotion.VoucherCartPricingResponse;
 import com.db.foodara.dto.response.promotion.VoucherPricingResponse;
 import com.db.foodara.dto.response.promotion.VoucherResponse;
+import com.db.foodara.entity.merchant.Merchant;
 import com.db.foodara.entity.order.Cart;
 import com.db.foodara.entity.order.CartItem;
 import com.db.foodara.entity.promotion.UserVoucher;
@@ -13,6 +15,7 @@ import com.db.foodara.entity.promotion.Voucher;
 import com.db.foodara.entity.store.Store;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
+import com.db.foodara.repository.merchant.MerchantRepository;
 import com.db.foodara.repository.order.CartItemRepository;
 import com.db.foodara.repository.order.CartRepository;
 import com.db.foodara.repository.promotion.UserVoucherRepository;
@@ -21,6 +24,7 @@ import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -40,6 +44,7 @@ public class VoucherService {
     private final UserRepository userRepository;
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final MerchantRepository merchantRepository;
 
     public List<VoucherResponse> getStoreVouchers(String storeId, String userId, BigDecimal subtotal) {
         Store store = storeRepository.findById(storeId)
@@ -612,9 +617,80 @@ public class VoucherService {
         return value.setScale(2, RoundingMode.HALF_UP);
     }
 
+    // crud merchant
+    public List<Voucher> getVouchersByMerchant(String userId) {
+
+        Merchant merchant = merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        return voucherRepository.findByMerchantId(merchant.getId());
+    }
+
+    @Transactional
+    public Voucher createVoucher(String userId, String storeId, VoucherRequest request){
+
+        Merchant merchant = merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        storeRepository.findStoreById(storeId).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+
+        validateVoucherBusinessLogic(request); // validate
+        Voucher voucher = new Voucher();
+        voucher.setMerchantId(merchant.getId());
+        voucher.setStoreId(storeId);
+        mapRequestToEntity(request, voucher);
+        return voucherRepository.save(voucher);
+    }
+
+    @Transactional
+    public Voucher updateVoucher(String userId, String voucherId, VoucherRequest request){
+        Merchant merchant = merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MENU_ITEM_NOT_FOUND));
+
+        validateVoucherBusinessLogic(request);
+        Voucher voucher = voucherRepository.findById(voucherId).orElseThrow(() -> new AppException(ErrorCode.VOUCHER_NOT_FOUND));
+        mapRequestToEntity(request, voucher);
+        return voucherRepository.save(voucher);
+    }
+
+    @Transactional
+    public Boolean deleteVouchers(String userId, String voucherId){
+        merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        voucherRepository.deleteById(voucherId);
+        return true;
+    }
+
+
+
     private record VoucherCandidate(Voucher voucher, VoucherPricingResponse pricing) {
     }
 
     private record RemovalType(boolean removePlatform, boolean removeStore) {
+    }
+
+    private void mapRequestToEntity(VoucherRequest request, Voucher voucher) {
+        voucher.setTitle(request.getTitle());
+        voucher.setCode(request.getCode());
+        voucher.setDescription(request.getDescription());
+        voucher.setDiscountType(request.getDiscountType());
+        voucher.setDiscountValue(request.getDiscountValue());
+        voucher.setMinOrderValue(request.getMinOrderValue());
+        voucher.setMaxDiscountValue(request.getMaxDiscountValue());
+        voucher.setTotalQuantity(request.getTotalQuantity());
+        voucher.setStoreId(request.getStoreId());
+        voucher.setStartsAt(request.getStartsAt());
+        voucher.setExpiresAt(request.getExpiresAt());
+        voucher.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
+    }
+
+    public void validateVoucherBusinessLogic(VoucherRequest request) {
+        if (request.getExpiresAt().isBefore(request.getStartsAt())) {
+            throw new AppException(ErrorCode.VOUCHER_TIME_INVALID);
+        }
+
+        if ("percentage".equals(request.getDiscountType())) {
+            if (request.getDiscountValue().compareTo(new BigDecimal("100")) > 0) {
+                throw new AppException(ErrorCode.VOUCHER_DISCOUNT_INVALID);
+            }
+            if (request.getMaxDiscountValue() == null || request.getMaxDiscountValue().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new AppException(ErrorCode.VOUCHER_DISCOUNT_INVALID);
+            }
+        }
+
     }
 }
