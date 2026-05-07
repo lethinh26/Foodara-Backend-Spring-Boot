@@ -108,6 +108,14 @@ public enum ErrorCode {
     VOUCHER_DISCOUNT_INVALID(2005, "Voucher discount is invalid" ),
     VOUCHER_TIME_INVALID(2006, "Voucher time is invalid"),
 
+    // payment
+    PAYMENT_FAILED(2100, "Payment processing failed"),
+    PAYMENT_INVALID(2101, "Invalid payment method"),
+
+    // order placement
+    ORDER_CANNOT_CANCEL(1802, "Order cannot be cancelled in current status"),
+    STORE_CLOSED(1803, "Store is currently closed")
+
     // campaign
     CAMPAIGN_NOT_FOUND(2100, "Campaign not found"),
 
