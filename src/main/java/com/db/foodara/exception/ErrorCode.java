@@ -114,7 +114,7 @@ public enum ErrorCode {
 
     // order placement
     ORDER_CANNOT_CANCEL(1802, "Order cannot be cancelled in current status"),
-    STORE_CLOSED(1803, "Store is currently closed")
+    STORE_CLOSED(1803, "Store is currently closed"),
 
     // campaign
     CAMPAIGN_NOT_FOUND(2100, "Campaign not found"),

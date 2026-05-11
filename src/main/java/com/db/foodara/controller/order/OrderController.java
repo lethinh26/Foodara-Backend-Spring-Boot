@@ -2,6 +2,7 @@ package com.db.foodara.controller.order;
 
 import com.db.foodara.dto.request.order.RejectOrderRequest;
 import com.db.foodara.dto.response.ApiResponse;
+import com.db.foodara.dto.response.order.OrderResponseDTO;
 import com.db.foodara.entity.order.Order;
 import com.db.foodara.service.order.OrderService;
 import jakarta.validation.Valid;
@@ -20,27 +21,36 @@ public class OrderController {
     private OrderService orderService;
 
     @GetMapping
-    public ApiResponse<List<Order>> getAllOrder(Authentication authentication,
+    public ApiResponse<List<OrderResponseDTO>> getAllOrder(Authentication authentication,
                                                 @PathVariable String storeId){
         String userId = authentication.getName();
         return ApiResponse.success(orderService.getOrders(userId, storeId));
     }
 
     @GetMapping("/{orderId}")
-    public ApiResponse<Order> getOrderDetail(Authentication authentication,
-                                             @PathVariable String storeId,
-                                             @PathVariable String orderId) {
+    public ApiResponse<OrderResponseDTO> getOrderDetail(Authentication authentication,
+                                                        @PathVariable String storeId,
+                                                        @PathVariable String orderId) {
         String userId = authentication.getName();
         return ApiResponse.success(orderService.getOrderDetail(userId, storeId, orderId));
     }
 
     @PutMapping("/{orderId}/accept")
-    public ApiResponse<Order> acceptOrder(Authentication authentication,
+    public ApiResponse<OrderResponseDTO> acceptOrder(Authentication authentication,
                                           @PathVariable String storeId,
                                           @PathVariable String orderId) {
         String userId = authentication.getName();
         return ApiResponse.success(orderService.acceptOrder(userId, storeId, orderId));
     }
+
+    @PutMapping("/{orderId}/completed")
+    public ApiResponse<OrderResponseDTO> completeOrder(Authentication authentication,
+                                                     @PathVariable String storeId,
+                                                     @PathVariable String orderId) {
+        String userId = authentication.getName();
+        return ApiResponse.success(orderService.completedOrder(userId, storeId, orderId));
+    }
+
 
     @PutMapping("/{orderId}/reject")
     public ApiResponse<Order> rejectOrder(Authentication authentication,

@@ -1,8 +1,11 @@
 package com.db.foodara.service.order;
 
 import com.db.foodara.dto.request.order.RejectOrderRequest;
+import com.db.foodara.dto.response.order.OrderResponseDTO;
 import com.db.foodara.entity.order.Order;
+import com.db.foodara.entity.order.OrderItem;
 import com.db.foodara.entity.order.OrderStatusHistory;
+import com.db.foodara.entity.store.MenuItem;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.merchant.MerchantRepository;
@@ -10,16 +13,21 @@ import com.db.foodara.repository.order.OrderAssignmentRepository;
 import com.db.foodara.repository.order.OrderItemRepository;
 import com.db.foodara.repository.order.OrderRepository;
 import com.db.foodara.repository.order.OrderStatusHistoryRepository;
+import com.db.foodara.repository.store.MenuItemRepository;
 import com.db.foodara.repository.store.StoreRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class OrderService {
+    @Autowired
+    private MenuItemRepository menuItemRepository;
     @Autowired
     private MerchantRepository merchantRepository;
 
@@ -38,30 +46,46 @@ public class OrderService {
     @Autowired
     private OrderAssignmentRepository orderAssignmentRepository;
 
-    //114	GET	/api/merchant/stores/:storeId/orders	Danh sách đơn hàng
-    public List<Order> getOrders(String userId, String storeId){
-        merchantRepository.findByOwnerId(userId).orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
-        storeRepository.findStoreById(storeId).orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+    // 114. Lấy danh sách đơn hàng cho Merchant
+    public List<OrderResponseDTO> getOrders(String userId, String storeId) {
+        validateMerchantAndStore(userId, storeId);
+        List<Order> orders = orderRepository.findByStoreId(storeId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
 
-        return orderRepository.findByStoreId((storeId)).orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+        return orders.stream()
+                .map(this::mapToResponseDTO)
+                .toList();
     }
 
-    //115	GET	/api/merchant/orders/:id	Chi tiết đơn
-    public Order getOrderDetail(String userId, String storeId, String orderId) {
-        return validateAndGetOrder(userId, storeId, orderId);
+    // 115. Chi tiết đơn hàng
+    public OrderResponseDTO getOrderDetail(String userId, String storeId, String orderId) {
+        Order order = validateAndGetOrder(userId, storeId, orderId);
+        return mapToResponseDTO(order);
     }
 
-    //116	PUT	/api/merchant/orders/:id/accept	Chấp nhận đơn
+    // 116. Chấp nhận đơn
     @Transactional
-    public Order acceptOrder(String userId, String storeId, String orderId) {
+    public OrderResponseDTO acceptOrder(String userId, String storeId, String orderId) {
         Order order = validateAndGetOrder(userId, storeId, orderId);
 
         String oldStatus = order.getStatus();
-        order.setStatus("CONFIRMED");
+        order.setStatus("preparing"); // Đồng bộ với OrderStatus bên TS (lowercase)
         order.setConfirmedAt(LocalDateTime.now());
 
-        saveStatusHistory(order, oldStatus, "CONFIRMED", userId, "Merchant accepted order");
-        return orderRepository.save(order);
+        saveStatusHistory(order, oldStatus, "preparing", userId, "Merchant accepted order");
+        return mapToResponseDTO(orderRepository.save(order));
+    }
+
+    @Transactional
+    public OrderResponseDTO completedOrder(String userId, String storeId, String orderId) {
+        Order order = validateAndGetOrder(userId, storeId, orderId);
+
+        String oldStatus = order.getStatus();
+        order.setStatus("completed"); // Đồng bộ với OrderStatus bên TS (lowercase)
+        order.setConfirmedAt(LocalDateTime.now());
+
+        saveStatusHistory(order, oldStatus, "completed", userId, "Merchant accepted order");
+        return mapToResponseDTO(orderRepository.save(order));
     }
 
     //117	PUT	/api/merchant/orders/:id/reject	Từ chối đơn (kèm lý do)
@@ -98,10 +122,10 @@ public class OrderService {
         Order order = validateAndGetOrder(userId, storeId, orderId);
 
         String oldStatus = order.getStatus();
-        order.setStatus("READY_FOR_PICKUP");
+        order.setStatus("ready_for_pickup");
         order.setReadyAt(LocalDateTime.now());
 
-        saveStatusHistory(order, oldStatus, "READY_FOR_PICKUP", userId, "Food is ready for driver");
+        saveStatusHistory(order, oldStatus, "ready_for_pickup", userId, "Food is ready for driver");
         return orderRepository.save(order);
     }
 
@@ -111,10 +135,10 @@ public class OrderService {
         Order order = validateAndGetOrder(userId, storeId, orderId);
 
         String oldStatus = order.getStatus();
-        order.setStatus("PICKED_UP");
+        order.setStatus("picked_up");
         order.setPickedUpAt(LocalDateTime.now());
 
-        saveStatusHistory(order, oldStatus, "PICKED_UP", userId, "Handed over to driver");
+        saveStatusHistory(order, oldStatus, "picked_up", userId, "Handed over to driver");
         return orderRepository.save(order);
     }
 
@@ -150,4 +174,47 @@ public class OrderService {
         history.setCreatedAt(LocalDateTime.now());
         orderStatusHistoryRepository.save(history);
     }
+
+    // --- Hàm Helper Mapping ---
+    private OrderResponseDTO mapToResponseDTO(Order order) {
+        // Bạn có thể dùng MapStruct ở đây, dưới đây là map tay ví dụ:
+        return OrderResponseDTO.builder()
+                .id(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .status(order.getStatus())
+                .storeId(order.getStoreId())
+                .storeName(order.getStoreName())
+                // Map pricing khớp với interface CheckoutPricing
+                .pricing(OrderResponseDTO.PricingDTO.builder()
+                        .subtotal(order.getSubtotal())
+                        .deliveryFee(order.getDeliveryFee())
+                        .platformFee(order.getPlatformFee())
+                        .discount(order.getStoreDiscount())
+                        .total(order.getTotalAmount())
+                        .build())
+                .items(orderItemRepository.findByOrderId(order.getId()).stream()
+                        .map(item -> OrderResponseDTO.OrderItemResponseDTO.builder()
+                                .id(item.getMenuItemId())
+                                .menuItemId(item.getMenuItemId())
+                                .image(item.getItemImageUrl())
+                                .name(item.getItemName())
+                                .quantity(item.getQuantity())
+                                .note(item.getSpecialInstructions())
+                                .comboId(item.getComboId())
+                                .price(item.getUnitPrice())
+                                .totalPrice(item.getTotalPrice())
+                                .selectedOptions(item.getOptionsSnapshot())
+                                .build())
+                        .toList())
+                .createdAt(order.getCreatedAt())
+                .build();
+    }
+
+    private void validateMerchantAndStore(String userId, String storeId) {
+        merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        storeRepository.findStoreById(storeId)
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
+    }
+
 }

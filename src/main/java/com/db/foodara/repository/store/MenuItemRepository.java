@@ -30,4 +30,6 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, String>, Jpa
     List<MenuItem> findByStoreId(String storeId);
 
     MenuItem removeByid(String id);
+
+    List<MenuItem> getMenuItemsByStoreId(String storeId);
 }
