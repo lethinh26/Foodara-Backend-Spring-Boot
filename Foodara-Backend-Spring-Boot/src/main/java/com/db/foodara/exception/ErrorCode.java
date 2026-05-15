@@ -117,7 +117,6 @@ public enum ErrorCode {
     ADMIN_ACCESS_DENIED(3000, "Admin access denied"),
     DRIVER_NOT_FOUND(3001, "Driver not found"),
     REVIEW_NOT_FOUND(3002, "Review not found"),
-    SETTLEMENT_NOT_FOUND(3003, "Settlement not found"),
     CONFIG_NOT_FOUND(3004, "Config not found"),
     CONFIG_NOT_EDITABLE(3005, "Config is not editable"),
     NOTIFICATION_NOT_FOUND(3006, "Notification not found"),
