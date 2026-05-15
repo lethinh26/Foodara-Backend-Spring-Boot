@@ -50,7 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/v1/merchant/**").hasRole("MERCHANT")
                         .requestMatchers("/v1/users/check-merchant/**", "/v1/auth/user-role").permitAll()
                         .requestMatchers("/payments/webhook").permitAll()
-                        .requestMatchers("/v1/payment/sepay/ipn", "/v1/payment/sepay/callback").permitAll()
+                        .requestMatchers("/v1/internal/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

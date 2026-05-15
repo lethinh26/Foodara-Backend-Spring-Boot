@@ -22,6 +22,12 @@ public interface VoucherRepository extends JpaRepository<Voucher, String> {
                                        @Param("merchantId") String merchantId,
                                        @Param("now") LocalDateTime now);
 
+    @Query("SELECT v FROM Voucher v WHERE v.isActive = true " +
+            "AND v.voucherType = 'platform' " +
+            "AND (v.startsAt IS NULL OR v.startsAt <= :now) " +
+            "AND (v.expiresAt IS NULL OR v.expiresAt >= :now)")
+    List<Voucher> findActivePlatformVouchers(@Param("now") LocalDateTime now);
+
     // Admin queries
     Page<Voucher> findByVoucherType(String voucherType, Pageable pageable);
 

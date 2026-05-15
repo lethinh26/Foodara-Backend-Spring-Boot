@@ -1,6 +1,6 @@
 package com.db.foodara.service.order;
 
-import com.db.foodara.config.SepayConfig;
+import com.db.foodara.client.PaymentServiceClient;
 import com.db.foodara.dto.request.order.CheckoutPreviewRequest;
 import com.db.foodara.dto.request.order.PlaceOrderRequest;
 import com.db.foodara.dto.response.order.CheckoutPreviewResponse;
@@ -14,7 +14,6 @@ import com.db.foodara.repository.order.*;
 import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
-import com.db.foodara.service.payment.SepayService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,8 +40,7 @@ public class CustomerOrderService {
     private final UserRepository userRepository;
     private final UserAddressRepository userAddressRepository;
     private final CheckoutService checkoutService;
-    private final SepayService sepayService;
-    private final SepayConfig sepayConfig;
+    private final PaymentServiceClient paymentServiceClient;
 
     @Value("${app.frontend.base-url:http://localhost:5173}")
     private String frontendBaseUrl;
@@ -157,13 +155,13 @@ public class CustomerOrderService {
         // 11. Handle SePay checkout for QR payment
         String checkoutUrl = null;
         if ("qr".equalsIgnoreCase(request.getPaymentMethod())) {
-            String backendBaseUrl = "http://localhost:8080/api"; // TODO: make configurable
-            String successUrl = backendBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=success";
-            String errorUrl = backendBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=error";
-            String cancelUrl = backendBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=cancel";
+            String gatewayBaseUrl = "http://localhost:8080/api"; // Callback goes through API Gateway → payment-service
+            String successUrl = gatewayBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=success";
+            String errorUrl = gatewayBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=error";
+            String cancelUrl = gatewayBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=cancel";
 
             try {
-                checkoutUrl = sepayService.createCheckout(
+                checkoutUrl = paymentServiceClient.createCheckout(
                         savedOrder.getId(),
                         orderNumber,
                         preview.getTotalAmount(),

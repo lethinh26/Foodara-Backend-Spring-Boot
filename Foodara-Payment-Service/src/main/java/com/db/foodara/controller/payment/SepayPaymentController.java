@@ -1,7 +1,6 @@
 package com.db.foodara.controller.payment;
 
-import com.db.foodara.dto.response.ApiResponse;
-import com.db.foodara.service.order.CustomerOrderService;
+import com.db.foodara.client.MainBackendClient;
 import com.db.foodara.service.payment.SepayService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,7 @@ import java.util.Map;
 public class SepayPaymentController {
 
     private final SepayService sepayService;
-    private final CustomerOrderService customerOrderService;
+    private final MainBackendClient mainBackendClient;
 
     /**
      * IPN (Instant Payment Notification) endpoint.
@@ -46,7 +45,7 @@ public class SepayPaymentController {
                 String invoiceNumber = orderNode.get("order_invoice_number").asText();
                 log.info("SePay IPN: ORDER_PAID for invoice {}", invoiceNumber);
                 try {
-                    customerOrderService.updatePaymentStatus(invoiceNumber, "paid");
+                    mainBackendClient.updatePaymentStatus(invoiceNumber, "paid");
                 } catch (Exception e) {
                     log.error("Failed to update payment status for invoice {}", invoiceNumber, e);
                 }
@@ -66,6 +65,7 @@ public class SepayPaymentController {
             @RequestParam String status
     ) {
         // Redirect to frontend order page with payment status
+        // TODO: Ensure this URL can be dynamically configured if needed
         String frontendUrl = "http://localhost:5173/customer/order/" + orderId + "?payment=" + status;
         return ResponseEntity.status(302)
                 .header("Location", frontendUrl)
