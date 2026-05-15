@@ -73,6 +73,16 @@ public class VoucherService {
                 .collect(Collectors.toList());
     }
 
+    public List<VoucherResponse> getPlatformVouchers(String userId) {
+        LocalDateTime now = LocalDateTime.now();
+        Set<String> collectedIds = getCollectedVoucherIds(userId, now);
+
+        return voucherRepository.findActivePlatformVouchers(now).stream()
+                .map(voucher -> mapVoucherResponse(voucher, collectedIds.contains(voucher.getId()), null, null))
+                .sorted(Comparator.comparing(VoucherResponse::getDiscountValue, Comparator.nullsLast(BigDecimal::compareTo)).reversed())
+                .collect(Collectors.toList());
+    }
+
     public VoucherResponse collectVoucher(String userId, String voucherId) {
         ensureUserExists(userId);
 

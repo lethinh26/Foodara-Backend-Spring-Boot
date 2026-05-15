@@ -29,8 +29,8 @@ public class SepayService {
     private final SepayConfig sepayConfig;
     private final ObjectMapper objectMapper;
 
-        public String createCheckout(String orderId, String orderNumber, BigDecimal amount,
-            String description, String successUrl, String errorUrl, String cancelUrl) {
+    public String createCheckout(String orderId, String orderNumber, BigDecimal amount,
+        String description, String successUrl, String errorUrl, String cancelUrl) {
         try {
             Map<String, Object> checkoutData = new LinkedHashMap<>();
             checkoutData.put("currency", "VND");

@@ -68,6 +68,12 @@ public class VoucherController {
         return ApiResponse.success(voucherService.getMyVouchers(requireUserId(authentication), storeId, subtotal));
     }
 
+    @GetMapping("/vouchers/platform")
+    public ApiResponse<List<VoucherResponse>> getPlatformVouchers(Authentication authentication) {
+        String userId = authentication != null ? authentication.getName() : null;
+        return ApiResponse.success(voucherService.getPlatformVouchers(userId));
+    }
+
     @PostMapping("/vouchers/{id}/collect")
     public ApiResponse<VoucherResponse> collectVoucher(
             Authentication authentication,
