@@ -1,5 +1,23 @@
 package com.db.foodara.service.order;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import com.db.foodara.dto.request.order.AddCartItemRequest;
 import com.db.foodara.dto.request.order.UpdateCartItemRequest;
 import com.db.foodara.dto.response.order.CartResponse;
@@ -8,25 +26,28 @@ import com.db.foodara.dto.response.promotion.VoucherCartPricingResponse;
 import com.db.foodara.entity.order.Cart;
 import com.db.foodara.entity.order.CartItem;
 import com.db.foodara.entity.order.CartItemOption;
-import com.db.foodara.entity.store.*;
+import com.db.foodara.entity.store.Combo;
+import com.db.foodara.entity.store.MenuItem;
+import com.db.foodara.entity.store.MenuItemOptionGroup;
+import com.db.foodara.entity.store.OptionGroup;
+import com.db.foodara.entity.store.OptionItem;
+import com.db.foodara.entity.store.Store;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.order.CartItemOptionRepository;
 import com.db.foodara.repository.order.CartItemRepository;
 import com.db.foodara.repository.order.CartRepository;
-import com.db.foodara.repository.store.*;
+import com.db.foodara.repository.store.ComboRepository;
+import com.db.foodara.repository.store.MenuItemOptionGroupRepository;
+import com.db.foodara.repository.store.MenuItemRepository;
+import com.db.foodara.repository.store.OptionGroupRepository;
+import com.db.foodara.repository.store.OptionItemRepository;
+import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.user.UserRepository;
 import com.db.foodara.service.promotion.VoucherService;
+
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -84,9 +105,22 @@ public class CartService {
                 sortedNewOptionIds,
                 newNote
         );
+        
 
         if (existingItem != null) {
-            existingItem.setQuantity(existingItem.getQuantity() + request.getQuantity());
+            int newTotal = existingItem.getQuantity() + request.getQuantity();
+            // Re-validate total quantity against stock for tracked items
+            if (selection.menuItem != null
+                    && selection.menuItem.getStockQuantity() != null
+                    && selection.menuItem.getStockQuantity() > 0
+                    && Boolean.TRUE.equals(selection.menuItem.getTrackInventory())
+                    && newTotal > selection.menuItem.getStockQuantity()) {
+                throw new AppException(ErrorCode.MENU_ITEM_OUT_OF_STOCK,
+                        selection.menuItem.getName() != null
+                                ? selection.menuItem.getName() + " (tồn kho: " + selection.menuItem.getStockQuantity() + ")"
+                                : null);
+            }
+            existingItem.setQuantity(newTotal);
             existingItem.setUnitPrice(selection.unitPrice);
             cartItemRepository.save(existingItem);
         } else {
@@ -363,10 +397,17 @@ public class CartService {
             if (menuItem.getMaxQuantityPerOrder() != null && quantity > menuItem.getMaxQuantityPerOrder()) {
                 throw new AppException(ErrorCode.CART_INVALID_REQUEST);
             }
+            // Block when stock is explicitly 0 — regardless of trackInventory flag.
+            // This covers the case where merchant depleted stock via dashboard.
+            if (menuItem.getStockQuantity() != null && menuItem.getStockQuantity() <= 0) {
+                throw new AppException(ErrorCode.MENU_ITEM_OUT_OF_STOCK,
+                        menuItem.getName() != null ? menuItem.getName() : "Món #" + menuItemId);
+            }
             if (Boolean.TRUE.equals(menuItem.getTrackInventory())
                     && menuItem.getStockQuantity() != null
                     && quantity > menuItem.getStockQuantity()) {
-                throw new AppException(ErrorCode.CART_ITEM_UNAVAILABLE);
+                throw new AppException(ErrorCode.MENU_ITEM_OUT_OF_STOCK,
+                        menuItem.getName() != null ? menuItem.getName() : "Món #" + menuItemId);
             }
         }
 

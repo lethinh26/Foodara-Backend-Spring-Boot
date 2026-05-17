@@ -1,10 +1,10 @@
 package com.db.foodara.dto.request.merchant;
 
+import java.time.LocalTime;
+
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalTime;
 
 @Getter
 @Setter
@@ -12,10 +12,10 @@ public class StoreOperatingHoursRequest {
     @NotNull(message = "Day of week is required")
     private Integer dayOfWeek;
 
-    @NotNull(message = "Open time is required")
+    /** Required when the day is open; ignored if {@code isClosed=true}. */
     private LocalTime openTime;
 
-    @NotNull(message = "Close time is required")
+    /** Required when the day is open; ignored if {@code isClosed=true}. */
     private LocalTime closeTime;
 
     private Boolean isClosed;

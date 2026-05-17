@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+    private final WebSocketHandshakeInterceptor webSocketHandshakeInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -29,7 +30,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws/connect")
-                .setAllowedOriginPatterns("*"); // Gateway will forward to this
+                .setAllowedOriginPatterns("*") // Gateway will forward to this
+                .addInterceptors(webSocketHandshakeInterceptor); // Read token from cookie/header at handshake time
     }
 
     @Override

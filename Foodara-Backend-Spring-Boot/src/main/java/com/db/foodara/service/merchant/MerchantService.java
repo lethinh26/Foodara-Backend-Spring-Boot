@@ -1,26 +1,39 @@
 package com.db.foodara.service.merchant;
 
-import com.db.foodara.dto.request.merchant.*;
-import com.db.foodara.dto.response.merchant.BankAccountResponse;
-import com.db.foodara.dto.response.merchant.MerchantDocumentResponse;
-import com.db.foodara.dto.response.merchant.MerchantProfileResponse;
-import com.db.foodara.dto.response.store.StoreResponse;
-import com.db.foodara.entity.merchant.*;
-import com.db.foodara.entity.store.Store;
-import com.db.foodara.entity.role.Role;
-import com.db.foodara.entity.user.UserRole;
-import com.db.foodara.exception.AppException;
-import com.db.foodara.exception.ErrorCode;
-import com.db.foodara.repository.merchant.*;
-import com.db.foodara.repository.store.StoreRepository;
-import com.db.foodara.repository.role.RoleRepository;
-import com.db.foodara.repository.user.UserRoleRepository;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.db.foodara.dto.request.merchant.BankAccountRequest;
+import com.db.foodara.dto.request.merchant.MerchantDocumentRequest;
+import com.db.foodara.dto.request.merchant.MerchantProfileRequest;
+import com.db.foodara.dto.request.merchant.MerchantRegisterRequest;
+import com.db.foodara.dto.request.merchant.StoreCreateRequest;
+import com.db.foodara.dto.request.merchant.StoreOperatingHoursRequest;
+import com.db.foodara.dto.request.merchant.StoreUpdateRequest;
+import com.db.foodara.dto.response.merchant.BankAccountResponse;
+import com.db.foodara.dto.response.merchant.MerchantDocumentResponse;
+import com.db.foodara.dto.response.merchant.MerchantProfileResponse;
+import com.db.foodara.dto.response.store.StoreResponse;
+import com.db.foodara.entity.merchant.Merchant;
+import com.db.foodara.entity.merchant.StoreBankAccount;
+import com.db.foodara.entity.merchant.StoreDocument;
+import com.db.foodara.entity.merchant.StoreOperatingHours;
+import com.db.foodara.entity.role.Role;
+import com.db.foodara.entity.store.Store;
+import com.db.foodara.entity.user.UserRole;
+import com.db.foodara.exception.AppException;
+import com.db.foodara.exception.ErrorCode;
+import com.db.foodara.repository.merchant.MerchantRepository;
+import com.db.foodara.repository.merchant.StoreBankAccountRepository;
+import com.db.foodara.repository.merchant.StoreDocumentRepository;
+import com.db.foodara.repository.merchant.StoreOperatingHoursRepository;
+import com.db.foodara.repository.role.RoleRepository;
+import com.db.foodara.repository.store.StoreRepository;
+import com.db.foodara.repository.user.UserRoleRepository;
 
 @Service
 public class MerchantService {
@@ -248,15 +261,28 @@ public class MerchantService {
         Store store = storeRepository.findByIdAndMerchantId(storeId, merchant.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
 
+        // Delete + flush before re-inserting; otherwise Hibernate may reorder operations
+        // and trigger the unique (store_id, day_of_week) constraint violation.
         storeOperatingHoursRepository.deleteByStoreId(storeId);
+        storeOperatingHoursRepository.flush();
+
+        if (requests == null || requests.isEmpty()) {
+            return;
+        }
 
         for (StoreOperatingHoursRequest request : requests) {
+            if (request == null || request.getDayOfWeek() == null) {
+                continue;
+            }
+            boolean closed = Boolean.TRUE.equals(request.getIsClosed());
             StoreOperatingHours hours = new StoreOperatingHours();
             hours.setStoreId(store.getId());
             hours.setDayOfWeek(request.getDayOfWeek());
-            hours.setOpenTime(request.getOpenTime());
-            hours.setCloseTime(request.getCloseTime());
-            hours.setIsClosed(request.getIsClosed() != null ? request.getIsClosed() : false);
+            // For closed days the times are not meaningful but the DB column may be NOT NULL,
+            // so fall back to 00:00 placeholders.
+            hours.setOpenTime(request.getOpenTime() != null ? request.getOpenTime() : java.time.LocalTime.MIDNIGHT);
+            hours.setCloseTime(request.getCloseTime() != null ? request.getCloseTime() : java.time.LocalTime.MIDNIGHT);
+            hours.setIsClosed(closed);
             storeOperatingHoursRepository.save(hours);
         }
     }

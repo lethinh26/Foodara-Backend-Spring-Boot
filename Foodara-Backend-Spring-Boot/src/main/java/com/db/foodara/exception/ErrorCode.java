@@ -1,7 +1,6 @@
 package com.db.foodara.exception;
 
 import lombok.Getter;
-import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
@@ -79,6 +78,7 @@ public enum ErrorCode {
     OPTION_GROUP_NOT_FOUND(1606, "Option group not found"),
     COMBO_ITEMS_REQUIRED(1607, "Combo items is required"),
     COMBO_NOT_FOUND(1608, "Combo is not founded"),
+    MENU_ITEM_OUT_OF_STOCK(1609, "Một số món đã hết hàng"),
 
     // Merchant
     MERCHANT_NOT_FOUND(1700, "Merchant not found"),
@@ -117,6 +117,7 @@ public enum ErrorCode {
     ADMIN_ACCESS_DENIED(3000, "Admin access denied"),
     DRIVER_NOT_FOUND(3001, "Driver not found"),
     REVIEW_NOT_FOUND(3002, "Review not found"),
+    REVIEW_ALREADY_EXISTS(3003, "Bạn đã đánh giá đơn hàng này rồi"),
     CONFIG_NOT_FOUND(3004, "Config not found"),
     CONFIG_NOT_EDITABLE(3005, "Config is not editable"),
     NOTIFICATION_NOT_FOUND(3006, "Notification not found"),
@@ -124,11 +125,16 @@ public enum ErrorCode {
     CAMPAIGN_NOT_FOUND(3008, "Campaign not found"),
     BANNER_NOT_FOUND(3009, "Banner not found"),
     INCENTIVE_NOT_FOUND(3010, "Incentive program not found"),
-    STORE_TAG_NOT_FOUND(3011, "Store tag not found"),
     ROLE_NOT_FOUND(3012, "Role not found"),
     PERMISSION_NOT_FOUND(3013, "Permission not found"),
     CANNOT_UPDATE_SELF(3014, "Cannot modify your own account"),
-    CANNOT_MODIFY_SUPERADMIN(3015, "Cannot modify a superadmin account")
+    CANNOT_MODIFY_SUPERADMIN(3015, "Cannot modify a superadmin account"),
+
+    // Merchant — vouchers / campaigns / reports
+    VOUCHER_NOT_OWNED_BY_MERCHANT(2010, "Voucher is not owned by this merchant"),
+    VOUCHER_CODE_EXISTED(2011, "Voucher code already exists"),
+    CAMPAIGN_ALREADY_JOINED(3020, "Store has already joined this campaign"),
+    INVALID_DATE_RANGE(3021, "Invalid date range")
 
     ;
     private int code;

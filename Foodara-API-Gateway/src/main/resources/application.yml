@@ -45,10 +45,12 @@ spring:
             # =============================================
             # Main Backend — catch-all (PHẢI để cuối cùng)
             # =============================================
+            # /api/**  → REST APIs (context-path on backend is /api)
+            # /api/ws/connect → STOMP WebSocket endpoint (also under /api context-path)
             - id: main-backend
               uri: http://${MAIN_BACKEND_HOST:localhost}:${MAIN_BACKEND_PORT:8081}
               predicates:
-                - Path=/api/**, /ws/**
+                - Path=/api/**
 
       # CORS handled by CorsConfig.java (programmatic CorsWebFilter)
 
