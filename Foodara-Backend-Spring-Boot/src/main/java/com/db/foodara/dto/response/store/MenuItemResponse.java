@@ -1,11 +1,16 @@
 package com.db.foodara.dto.response.store;
 
-import com.db.foodara.dto.response.promotion.VoucherPricingResponse;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import com.db.foodara.dto.response.promotion.VoucherPricingResponse;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -34,5 +39,9 @@ public class MenuItemResponse {
     private Integer totalRatings;
     private Integer totalSold;
     private Integer maxQuantityPerOrder;
+    private Boolean trackInventory;
+    private Integer stockQuantity;
+    private Integer dailyLimit;
+    private Integer dailySoldCount;
     private LocalDateTime createdAt;
 }

@@ -96,6 +96,12 @@ public class MerchantMenuController {
         return ApiResponse.success(merchantMenuService.createOptionItem(authentication.getName(), id, requests));
     }
 
+    /** Returns the list of option-group IDs currently linked to a menu item — used by the FE edit modal. */
+    @GetMapping("/menu-items/{id}/option-groups")
+    public ApiResponse<List<String>> getMenuItemOptionGroups(Authentication authentication, @PathVariable String id) {
+        return ApiResponse.success(merchantMenuService.getMenuItemOptionGroupIds(authentication.getName(), id));
+    }
+
     @PostMapping("/stores/{storeId}/combos")
     public ApiResponse<ComboResponse> createCombo(
             Authentication authentication,
@@ -106,6 +112,11 @@ public class MerchantMenuController {
                 storeId,
                 wrapper.getComboRequest(),
                 wrapper.getComboItems()));
+    }
+
+    @GetMapping("/stores/{storeId}/combos")
+    public ApiResponse<List<ComboResponse>> getCombosByStore(Authentication authentication, @PathVariable String storeId) {
+        return ApiResponse.success(merchantMenuService.getCombosByStore(authentication.getName(), storeId));
     }
 
     @PutMapping("/combos/{id}")

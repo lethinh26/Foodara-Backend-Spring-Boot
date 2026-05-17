@@ -1,14 +1,16 @@
 package com.db.foodara.repository.promotion;
 
-import com.db.foodara.entity.promotion.UserVoucher;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import com.db.foodara.entity.promotion.UserVoucher;
 
 @Repository
 public interface UserVoucherRepository extends JpaRepository<UserVoucher, String> {
@@ -26,4 +28,23 @@ public interface UserVoucherRepository extends JpaRepository<UserVoucher, String
 
     @Query("SELECT COUNT(uv) FROM UserVoucher uv WHERE uv.userId = :userId AND uv.voucher.id = :voucherId AND uv.isUsed = true")
     long countUsedByUserAndVoucher(@Param("userId") String userId, @Param("voucherId") String voucherId);
+
+    /** Mark the matching ticket as used. No-op when the user has not collected this voucher. */
+    @Modifying
+    @Query("UPDATE UserVoucher uv SET uv.isUsed = true, uv.usedAt = :usedAt, uv.orderId = :orderId " +
+            "WHERE uv.userId = :userId AND uv.voucher.id = :voucherId AND uv.isUsed = false")
+    int markUsed(@Param("userId") String userId,
+                 @Param("voucherId") String voucherId,
+                 @Param("orderId") String orderId,
+                 @Param("usedAt") LocalDateTime usedAt);
+
+    /** Reverse {@link #markUsed} when an order using the voucher is cancelled. */
+    @Modifying
+    @Query("UPDATE UserVoucher uv SET uv.isUsed = false, uv.usedAt = null, uv.orderId = null " +
+            "WHERE uv.orderId = :orderId")
+    int resetUsageForOrder(@Param("orderId") String orderId);
+
+    /** Returns voucher IDs the user has already used (is_used = true). */
+    @Query("SELECT uv.voucher.id FROM UserVoucher uv WHERE uv.userId = :userId AND uv.isUsed = true")
+    List<String> findUsedVoucherIdsByUserId(@Param("userId") String userId);
 }

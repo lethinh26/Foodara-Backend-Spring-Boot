@@ -47,4 +47,22 @@ public class StoreResponse {
     private String promotionText;
     private Boolean isNew;
     private Boolean isFeatured;
+
+    /**
+     * True only when the store is currently accepting orders:
+     *   - {@code isOpen=true}
+     *   - {@code isActive=true}
+     *   - hôm nay không phải ngày nghỉ
+     *   - hiện tại nằm trong một khung giờ {@code [openTime, closeTime]}
+     */
+    private Boolean isOpenNow;
+
+    /**
+     * Lý do đóng nếu {@link #isOpenNow} là false:
+     * {@code merchant_closed} | {@code inactive} | {@code day_off} | {@code outside_hours}.
+     */
+    private String closeReason;
+
+    /** ISO local-time (HH:mm) khi quán mở lại lần kế tiếp; null nếu không xác định được. */
+    private String nextOpenTime;
 }

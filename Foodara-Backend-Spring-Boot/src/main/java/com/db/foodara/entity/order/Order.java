@@ -1,11 +1,25 @@
 package com.db.foodara.entity.order;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 
 @Entity
@@ -71,6 +85,17 @@ public class Order {
 
     @Transient
     private String storePhone;
+
+    /**
+     * Populated on demand by services when returning the order to the customer
+     * (e.g. {@code GET /v1/orders/{id}}). Not persisted.
+     */
+    @Transient
+    private List<OrderStatusHistory> statusHistory;
+
+    /** Populated on demand — order line items for detail views. */
+    @Transient
+    private List<OrderItem> orderItems;
 
     // Pricing
     @Column(name = "subtotal", precision = 12, scale = 2, nullable = false)

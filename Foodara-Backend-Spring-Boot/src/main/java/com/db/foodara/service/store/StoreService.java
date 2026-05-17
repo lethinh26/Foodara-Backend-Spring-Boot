@@ -1,22 +1,53 @@
 package com.db.foodara.service.store;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.db.foodara.dto.response.promotion.VoucherBestChoiceResponse;
 import com.db.foodara.dto.response.promotion.VoucherPricingResponse;
-import com.db.foodara.dto.response.store.*;
-import com.db.foodara.entity.store.*;
+import com.db.foodara.dto.response.store.ComboResponse;
+import com.db.foodara.dto.response.store.MenuCategoryResponse;
+import com.db.foodara.dto.response.store.MenuItemDetailResponse;
+import com.db.foodara.dto.response.store.MenuItemResponse;
+import com.db.foodara.dto.response.store.OperatingHourResponse;
+import com.db.foodara.dto.response.store.OptionGroupResponse;
+import com.db.foodara.dto.response.store.OptionItemResponse;
+import com.db.foodara.dto.response.store.ReviewResponse;
+import com.db.foodara.dto.response.store.StoreResponse;
+import com.db.foodara.entity.store.Combo;
+import com.db.foodara.entity.store.ComboItem;
+import com.db.foodara.entity.store.MenuCategory;
+import com.db.foodara.entity.store.MenuItem;
+import com.db.foodara.entity.store.MenuItemOptionGroup;
+import com.db.foodara.entity.store.OptionGroup;
+import com.db.foodara.entity.store.OptionItem;
+import com.db.foodara.entity.store.Review;
+import com.db.foodara.entity.store.Store;
 import com.db.foodara.exception.AppException;
 import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.merchant.StoreOperatingHoursRepository;
-import com.db.foodara.repository.store.*;
+import com.db.foodara.repository.store.ComboItemRepository;
+import com.db.foodara.repository.store.ComboRepository;
+import com.db.foodara.repository.store.MenuCategoryRepository;
+import com.db.foodara.repository.store.MenuItemOptionGroupRepository;
+import com.db.foodara.repository.store.MenuItemRepository;
+import com.db.foodara.repository.store.OptionGroupRepository;
+import com.db.foodara.repository.store.OptionItemRepository;
+import com.db.foodara.repository.store.ReviewRepository;
+import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.service.promotion.VoucherService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -298,12 +329,15 @@ public class StoreService {
                 .totalRatings(m.getTotalRatings())
                 .totalSold(m.getTotalSold())
                 .maxQuantityPerOrder(m.getMaxQuantityPerOrder())
+                .stockQuantity(Boolean.TRUE.equals(m.getTrackInventory()) ? m.getStockQuantity() : null)
+                .trackInventory(m.getTrackInventory())
                 .createdAt(m.getCreatedAt())
                 .optionGroups(optionGroups)
                 .build();
     }
 
     private StoreResponse mapToStoreResponse(Store s) {
+        OpenStatus open = computeOpenStatus(s);
         return StoreResponse.builder()
                 .id(s.getId())
                 .name(s.getName())
@@ -330,8 +364,94 @@ public class StoreService {
                 .promotionText("Giam 15%")
                 .isNew(false)
                 .isFeatured(s.getAvgRating() != null && s.getAvgRating().compareTo(BigDecimal.valueOf(4.5)) > 0)
+                .isOpenNow(open.isOpenNow)
+                .closeReason(open.reason)
+                .nextOpenTime(open.nextOpenTime)
                 .build();
     }
+
+    /**
+     * Determines whether the store is currently accepting orders by combining
+     * the merchant's manual on/off switch with the configured weekly schedule.
+     *
+     * Reasons returned in the response:
+     *   - {@code merchant_closed} : merchant tắt quán
+     *   - {@code inactive}        : tài khoản quán chưa active
+     *   - {@code day_off}         : hôm nay là ngày nghỉ trong lịch
+     *   - {@code outside_hours}   : ngoài khung giờ mở cửa
+     */
+    private OpenStatus computeOpenStatus(Store s) {
+        if (!Boolean.TRUE.equals(s.getIsActive())) {
+            return new OpenStatus(false, "inactive", null);
+        }
+        if (!Boolean.TRUE.equals(s.getIsOpen())) {
+            return new OpenStatus(false, "merchant_closed", null);
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        int todayDow = now.getDayOfWeek().getValue() % 7; // Monday=1..Sunday=0 to match DB convention
+        java.time.LocalTime nowTime = now.toLocalTime();
+
+        java.util.List<com.db.foodara.entity.merchant.StoreOperatingHours> all =
+                storeOperatingHoursRepository.findByStoreId(s.getId());
+        if (all.isEmpty()) {
+            // No schedule configured ⇒ rely solely on manual flag, treat as open.
+            return new OpenStatus(true, null, null);
+        }
+
+        java.util.List<com.db.foodara.entity.merchant.StoreOperatingHours> todaySlots = all.stream()
+                .filter(h -> h.getDayOfWeek() != null && h.getDayOfWeek() == todayDow)
+                .toList();
+
+        boolean dayOff = !todaySlots.isEmpty()
+                && todaySlots.stream().allMatch(h -> Boolean.TRUE.equals(h.getIsClosed()));
+
+        if (dayOff) {
+            return new OpenStatus(false, "day_off", findNextOpenTime(all, todayDow, nowTime));
+        }
+
+        boolean within = todaySlots.stream()
+                .filter(h -> !Boolean.TRUE.equals(h.getIsClosed()))
+                .anyMatch(h -> h.getOpenTime() != null
+                        && h.getCloseTime() != null
+                        && !nowTime.isBefore(h.getOpenTime())
+                        && nowTime.isBefore(h.getCloseTime()));
+
+        if (within) {
+            return new OpenStatus(true, null, null);
+        }
+        return new OpenStatus(false, "outside_hours", findNextOpenTime(all, todayDow, nowTime));
+    }
+
+    private String findNextOpenTime(java.util.List<com.db.foodara.entity.merchant.StoreOperatingHours> hours,
+                                    int todayDow,
+                                    java.time.LocalTime now) {
+        // Look for next slot today first
+        java.util.Optional<java.time.LocalTime> later = hours.stream()
+                .filter(h -> h.getDayOfWeek() != null && h.getDayOfWeek() == todayDow)
+                .filter(h -> !Boolean.TRUE.equals(h.getIsClosed()) && h.getOpenTime() != null)
+                .map(com.db.foodara.entity.merchant.StoreOperatingHours::getOpenTime)
+                .filter(t -> t.isAfter(now))
+                .min(java.time.LocalTime::compareTo);
+        if (later.isPresent()) {
+            return later.get().toString();
+        }
+        // Otherwise pick the earliest opening on the next available day.
+        for (int offset = 1; offset <= 7; offset++) {
+            int dow = (todayDow + offset) % 7;
+            java.util.Optional<java.time.LocalTime> next = hours.stream()
+                    .filter(h -> h.getDayOfWeek() != null && h.getDayOfWeek() == dow)
+                    .filter(h -> !Boolean.TRUE.equals(h.getIsClosed()) && h.getOpenTime() != null)
+                    .map(com.db.foodara.entity.merchant.StoreOperatingHours::getOpenTime)
+                    .min(java.time.LocalTime::compareTo);
+            if (next.isPresent()) {
+                return next.get().toString();
+            }
+        }
+        return null;
+    }
+
+    private record OpenStatus(boolean isOpenNow, String reason, String nextOpenTime) {}
 
     private MenuCategoryResponse mapToMenuCategoryResponse(MenuCategory c, int itemCount) {
         return MenuCategoryResponse.builder()

@@ -1,5 +1,22 @@
 package com.db.foodara.service.promotion;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import com.db.foodara.dto.request.promotion.VoucherApplyRequest;
 import com.db.foodara.dto.request.promotion.VoucherRemoveRequest;
 import com.db.foodara.dto.response.promotion.VoucherBestChoiceResponse;
@@ -19,16 +36,8 @@ import com.db.foodara.repository.promotion.UserVoucherRepository;
 import com.db.foodara.repository.promotion.VoucherRepository;
 import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.user.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -47,8 +56,10 @@ public class VoucherService {
 
         LocalDateTime now = LocalDateTime.now();
         Set<String> collectedIds = getCollectedVoucherIds(userId, now);
+        Set<String> usedIds = getUsedVoucherIds(userId);
 
         return voucherRepository.findAvailableByStore(storeId, store.getMerchantId(), now).stream()
+                .filter(voucher -> !usedIds.contains(voucher.getId()))
                 .map(voucher -> mapVoucherResponse(voucher, collectedIds.contains(voucher.getId()), subtotal, null))
                 .sorted(Comparator.comparing(VoucherResponse::getPotentialDiscount, Comparator.nullsLast(BigDecimal::compareTo)).reversed())
                 .collect(Collectors.toList());
@@ -76,8 +87,10 @@ public class VoucherService {
     public List<VoucherResponse> getPlatformVouchers(String userId) {
         LocalDateTime now = LocalDateTime.now();
         Set<String> collectedIds = getCollectedVoucherIds(userId, now);
+        Set<String> usedIds = getUsedVoucherIds(userId);
 
         return voucherRepository.findActivePlatformVouchers(now).stream()
+                .filter(voucher -> !usedIds.contains(voucher.getId()))
                 .map(voucher -> mapVoucherResponse(voucher, collectedIds.contains(voucher.getId()), null, null))
                 .sorted(Comparator.comparing(VoucherResponse::getDiscountValue, Comparator.nullsLast(BigDecimal::compareTo)).reversed())
                 .collect(Collectors.toList());
@@ -527,6 +540,14 @@ public class VoucherService {
         return userVoucherRepository.findActiveByUserId(userId, now).stream()
                 .map(uv -> uv.getVoucher().getId())
                 .collect(Collectors.toSet());
+    }
+
+    /** Voucher IDs this user has already redeemed (is_used = true) — should be hidden from listings. */
+    private Set<String> getUsedVoucherIds(String userId) {
+        if (!StringUtils.hasText(userId)) {
+            return Collections.emptySet();
+        }
+        return new java.util.HashSet<>(userVoucherRepository.findUsedVoucherIdsByUserId(userId));
     }
 
     private boolean isVoucherInScope(Voucher voucher, String storeId, String merchantId) {

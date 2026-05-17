@@ -30,4 +30,17 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, String>, Jpa
     List<MenuItem> findByStoreId(String storeId);
 
     MenuItem removeByid(String id);
+
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE MenuItem m SET m.stockQuantity = m.stockQuantity - :qty " +
+            "WHERE m.id = :id AND m.trackInventory = true " +
+            "AND m.stockQuantity IS NOT NULL AND m.stockQuantity >= :qty")
+    int decrementStockIfEnough(@Param("id") String id, @Param("qty") int qty);
+
+    /** Atomic stock restore for cancelled orders — never inflates an untracked item. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE MenuItem m SET m.stockQuantity = COALESCE(m.stockQuantity, 0) + :qty " +
+            "WHERE m.id = :id AND m.trackInventory = true")
+    int incrementStock(@Param("id") String id, @Param("qty") int qty);
 }

@@ -1,20 +1,42 @@
 package com.db.foodara.service.merchant;
 
-import com.db.foodara.dto.request.store.*;
-import com.db.foodara.dto.response.store.*;
-import com.db.foodara.entity.store.*;
-import com.db.foodara.entity.store.MenuItem;
-import com.db.foodara.exception.AppException;
-import com.db.foodara.exception.ErrorCode;
-import com.db.foodara.repository.merchant.MerchantRepository;
-import com.db.foodara.repository.store.*;
-import jakarta.transaction.Transactional;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
+import com.db.foodara.dto.request.store.ComboItemRequest;
+import com.db.foodara.dto.request.store.ComboRequest;
+import com.db.foodara.dto.request.store.MenuCategoryRequest;
+import com.db.foodara.dto.request.store.MenuItemRequest;
+import com.db.foodara.dto.request.store.OptionItemRequest;
+import com.db.foodara.dto.request.store.OptionalGroupRequest;
+import com.db.foodara.dto.response.store.ComboResponse;
+import com.db.foodara.dto.response.store.MenuCategoryResponse;
+import com.db.foodara.dto.response.store.MenuItemResponse;
+import com.db.foodara.dto.response.store.OptionGroupResponse;
+import com.db.foodara.dto.response.store.OptionItemResponse;
+import com.db.foodara.entity.store.Combo;
+import com.db.foodara.entity.store.ComboItem;
+import com.db.foodara.entity.store.MenuCategory;
+import com.db.foodara.entity.store.MenuItem;
+import com.db.foodara.entity.store.MenuItemOptionGroup;
+import com.db.foodara.entity.store.OptionGroup;
+import com.db.foodara.entity.store.OptionItem;
+import com.db.foodara.exception.AppException;
+import com.db.foodara.exception.ErrorCode;
+import com.db.foodara.repository.merchant.MerchantRepository;
+import com.db.foodara.repository.store.ComboItemRepository;
+import com.db.foodara.repository.store.ComboRepository;
+import com.db.foodara.repository.store.MenuCategoryRepository;
+import com.db.foodara.repository.store.MenuItemOptionGroupRepository;
+import com.db.foodara.repository.store.MenuItemRepository;
+import com.db.foodara.repository.store.OptionGroupRepository;
+import com.db.foodara.repository.store.OptionItemRepository;
+import com.db.foodara.repository.store.StoreRepository;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class MerchantMenuService {
@@ -41,6 +63,9 @@ public class MerchantMenuService {
 
     @Autowired
     private ComboItemRepository comboItemRepository;
+
+    @Autowired
+    private MenuItemOptionGroupRepository menuItemOptionGroupRepository;
 
     // 97 GET	/api/merchant/stores/:storeId/menu-categories	Danh sách danh mục do lay cua store nen phai xac thuc
     public List<MenuCategory> getCategories(String userId, String storeId){
@@ -136,7 +161,12 @@ public class MerchantMenuService {
         menuItem.setIsNew(request.getIsNew());
         menuItem.setDisplayOrder(request.getDisplayOrder());
 
-        return toMenuItemResponse(menuItemRepository.save(menuItem));
+        MenuItem saved = menuItemRepository.save(menuItem);
+        // Persist option group assignments (toppings, sizes, ...)
+        if (request.getOptionGroupIds() != null) {
+            saveOptionGroupAssignments(saved.getId(), request.getOptionGroupIds(), saved.getStoreId());
+        }
+        return toMenuItemResponse(saved);
     }
 
     // 103  PUT    /api/merchant/menu-items/:id   Sửa món
@@ -171,7 +201,11 @@ public class MerchantMenuService {
         if (request.getIsNew() != null) menuItem.setIsNew(request.getIsNew());
         if (request.getDisplayOrder() != null) menuItem.setDisplayOrder(request.getDisplayOrder());
 
-        return toMenuItemResponse(menuItemRepository.save(menuItem));
+        MenuItem saved = menuItemRepository.save(menuItem);
+        if (request.getOptionGroupIds() != null) {
+            saveOptionGroupAssignments(saved.getId(), request.getOptionGroupIds(), saved.getStoreId());
+        }
+        return toMenuItemResponse(saved);
     }
 
     // 104	DELETE	/api/merchant/menu-items/:id	Xoá món
@@ -283,6 +317,7 @@ public class MerchantMenuService {
         combo.setStoreId(storeId); // Lấy từ tham số hàm
         combo.setName(comboRequest.getName());
         combo.setDescription(comboRequest.getDescription());
+        combo.setImageUrl(comboRequest.getImageUrl());
         combo.setComboPrice(comboRequest.getComboPrice());
         combo.setIsActive(comboRequest.getIsActive() != null ? comboRequest.getIsActive() : true);
         combo.setStartsAt(comboRequest.getStartsAt());
@@ -322,6 +357,7 @@ public class MerchantMenuService {
 
         if (comboRequest.getName() != null) combo.setName(comboRequest.getName());
         if (comboRequest.getDescription() != null) combo.setDescription(comboRequest.getDescription());
+        if (comboRequest.getImageUrl() != null) combo.setImageUrl(comboRequest.getImageUrl());
         if (comboRequest.getComboPrice() != null) combo.setComboPrice(comboRequest.getComboPrice());
         if (comboRequest.getOriginalPrice() != null) combo.setOriginalPrice(comboRequest.getOriginalPrice());
         if (comboRequest.getIsActive() != null) combo.setIsActive(comboRequest.getIsActive());
@@ -365,7 +401,26 @@ public class MerchantMenuService {
         return true;
     }
 
+    /**
+     * GET /v1/merchant/stores/{storeId}/combos — list active combos with their items.
+     */
+    public List<ComboResponse> getCombosByStore(String userId, String storeId) {
+        merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        storeRepository.findStoreById(storeId)
+                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
 
+        List<Combo> combos = comboRepository.findByStoreIdAndIsActiveTrueOrderByDisplayOrderAsc(storeId);
+        if (combos.isEmpty()) {
+            return List.of();
+        }
+        List<String> comboIds = combos.stream().map(Combo::getId).toList();
+        java.util.Map<String, List<ComboItem>> itemsByCombo = comboItemRepository.findByComboIdIn(comboIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(ComboItem::getComboId));
+        return combos.stream()
+                .map(c -> toComboResponse(c, itemsByCombo.getOrDefault(c.getId(), List.of())))
+                .toList();
+    }
 
     public MenuCategoryResponse toMenuCategoryResponse(MenuCategory entity) {
         if (entity == null) {
@@ -404,8 +459,44 @@ public class MerchantMenuService {
                 .totalRatings(entity.getTotalRatings())
                 .totalSold(entity.getTotalSold())
                 .maxQuantityPerOrder(entity.getMaxQuantityPerOrder())
+                .trackInventory(entity.getTrackInventory())
+                .stockQuantity(entity.getStockQuantity())
+                .dailyLimit(entity.getDailyLimit())
+                .dailySoldCount(entity.getDailySoldCount())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    /** Replace the option group assignments for {@code menuItemId} with the given list. */
+    @Transactional
+    private void saveOptionGroupAssignments(String menuItemId, List<String> optionGroupIds, String storeId) {
+        menuItemOptionGroupRepository.deleteByMenuItemId(menuItemId);
+        if (optionGroupIds == null || optionGroupIds.isEmpty()) return;
+
+        // Filter to groups that exist and belong to the same store — silently drop the rest
+        List<OptionGroup> validGroups = optionGroupRepository.findAllById(optionGroupIds).stream()
+                .filter(g -> storeId == null || storeId.equals(g.getStoreId()))
+                .toList();
+
+        int displayOrder = 0;
+        for (OptionGroup group : validGroups) {
+            MenuItemOptionGroup link = new MenuItemOptionGroup();
+            link.setMenuItemId(menuItemId);
+            link.setOptionGroupId(group.getId());
+            link.setDisplayOrder(displayOrder++);
+            menuItemOptionGroupRepository.save(link);
+        }
+    }
+
+    /** List of option-group IDs already linked to a menu item — for the edit modal preload. */
+    public List<String> getMenuItemOptionGroupIds(String userId, String menuItemId) {
+        merchantRepository.findByOwnerId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.MERCHANT_NOT_FOUND));
+        menuItemRepository.findById(menuItemId)
+                .orElseThrow(() -> new AppException(ErrorCode.MENU_ITEM_NOT_FOUND));
+        return menuItemOptionGroupRepository.findByMenuItemId(menuItemId).stream()
+                .map(MenuItemOptionGroup::getOptionGroupId)
+                .toList();
     }
 
     public OptionItemResponse toOptionItemResponse(OptionItem entity) {
