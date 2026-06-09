@@ -1,0 +1,95 @@
+services:
+  db:
+    image: postgis/postgis:17-master
+    container_name: foodara-db
+    environment:
+      POSTGRES_DB: foodara
+      POSTGRES_USER: foodara
+      POSTGRES_PASSWORD: root
+    ports:
+      - "3309:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - "../docs/database foodarav4.sql:/docker-entrypoint-initdb.d/1-schema.sql"
+      - "../docs/mock_data.sql:/docker-entrypoint-initdb.d/2-data.sql"
+    networks:
+      - foodara-network
+
+  api-gateway:
+    build:
+      context: ./Foodara-API-Gateway
+      dockerfile: Dockerfile
+    container_name: foodara-api-gateway
+    depends_on:
+      - main-backend
+      - driver-service
+      - payment-service
+    env_file:
+      - ./Foodara-API-Gateway/.env
+    environment:
+      - MAIN_BACKEND_HOST=main-backend
+      - MAIN_BACKEND_PORT=8081
+      - DRIVER_SERVICE_HOST=driver-service
+      - DRIVER_SERVICE_PORT=8082
+      - PAYMENT_SERVICE_HOST=payment-service
+      - PAYMENT_SERVICE_PORT=8083
+    ports:
+      - "8080:8080"
+    networks:
+      - foodara-network
+
+  main-backend:
+    build:
+      context: ./Foodara-Backend-Spring-Boot
+      dockerfile: Dockerfile
+    container_name: foodara-main-backend
+    depends_on:
+      - db
+    env_file:
+      - ./Foodara-Backend-Spring-Boot/.env
+    environment:
+      - POSTGRESQL_DB_IP=db
+      - POSTGRESQL_DB_PORT=5432
+      - PAYMENT_SERVICE_URL=http://payment-service:8083
+    ports:
+      - "8081:8081"
+    networks:
+      - foodara-network
+
+  payment-service:
+    build:
+      context: ./Foodara-Payment-Service
+      dockerfile: Dockerfile
+    container_name: foodara-payment-service
+    env_file:
+      - ./Foodara-Payment-Service/.env
+    environment:
+      - MAIN_BACKEND_URL=http://main-backend:8081/api
+    ports:
+      - "8083:8083"
+    networks:
+      - foodara-network
+
+  driver-service:
+    build:
+      context: ./Foodara-Driver-Service
+      dockerfile: Dockerfile
+    container_name: foodara-driver-service
+    depends_on:
+      - db
+    env_file:
+      - ./Foodara-Backend-Spring-Boot/.env # Dùng chung cấu hình auth/jwt nếu cần
+    environment:
+      - POSTGRESQL_DB_IP=db
+      - POSTGRESQL_DB_PORT=5432
+    ports:
+      - "8082:8082"
+    networks:
+      - foodara-network
+
+networks:
+  foodara-network:
+    driver: bridge
+
+volumes:
+  pgdata:

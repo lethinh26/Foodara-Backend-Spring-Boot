@@ -1,0 +1,76 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: foodara-api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Remove duplicate CORS headers (Gateway + downstream both add them)
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers, RETAIN_FIRST
+          routes:
+            # =============================================
+            # Driver Service routes (specific → trước catch-all)
+            # =============================================
+            - id: driver-service
+              uri: http://${DRIVER_SERVICE_HOST:localhost}:${DRIVER_SERVICE_PORT:8082}
+              predicates:
+                - Path=/api/v1/driver/**
+
+            - id: driver-admin-service
+              uri: http://${DRIVER_SERVICE_HOST:localhost}:${DRIVER_SERVICE_PORT:8082}
+              predicates:
+                - Path=/api/v1/admin/drivers/**
+
+            # =============================================
+            # Notification Service [FUTURE — uncomment khi deploy]
+            # =============================================
+            # - id: notification-service
+            #   uri: http://${NOTIFICATION_SERVICE_HOST:localhost}:${NOTIFICATION_SERVICE_PORT:8083}
+            #   predicates:
+            #     - Path=/api/v1/notifications/**
+
+            # =============================================
+            # Payment Service
+            # =============================================
+            - id: payment-service
+              uri: http://${PAYMENT_SERVICE_HOST:localhost}:${PAYMENT_SERVICE_PORT:8083}
+              predicates:
+                - Path=/api/v1/payment/**
+
+            # =============================================
+            # Main Backend — catch-all (PHẢI để cuối cùng)
+            # =============================================
+            # /api/**  → REST APIs (context-path on backend is /api)
+            # /api/ws/connect → STOMP WebSocket endpoint (also under /api context-path)
+            - id: main-backend
+              uri: http://${MAIN_BACKEND_HOST:localhost}:${MAIN_BACKEND_PORT:8081}
+              predicates:
+                - Path=/api/**
+
+      # CORS handled by CorsConfig.java (programmatic CorsWebFilter)
+
+# JWT Configuration (shared secret with all services)
+app:
+  jwt:
+    secret: ${JWT_SECRET_KEY:123456789}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    gateway:
+      enabled: true
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    com.db.foodara.gateway: DEBUG

@@ -1,0 +1,66 @@
+package com.db.foodara.controller.store;
+
+import com.db.foodara.dto.response.ApiResponse;
+import com.db.foodara.dto.response.store.*;
+import com.db.foodara.service.store.StoreService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/v1/stores")
+@RequiredArgsConstructor
+public class StoreController {
+
+    private final StoreService storeService;
+
+    // C06: GET /v1/stores/:id
+    @GetMapping("/{id}")
+    public ApiResponse<StoreResponse> getStoreById(@PathVariable String id) {
+        return ApiResponse.success(storeService.getStoreById(id));
+    }
+
+    // C06: GET /v1/stores/:id/menu - docs alias for menu categories
+    @GetMapping("/{id}/menu")
+    public ApiResponse<List<MenuCategoryResponse>> getMenu(@PathVariable String id) {
+        return ApiResponse.success(storeService.getMenu(id));
+    }
+
+    // C07: GET /v1/stores/:id/menu-categories
+    @GetMapping("/{id}/menu-categories")
+    public ApiResponse<List<MenuCategoryResponse>> getMenuCategories(@PathVariable String id) {
+        return ApiResponse.success(storeService.getMenuCategories(id));
+    }
+
+    // C07: GET /v1/stores/:id/menu-items
+    @GetMapping("/{id}/menu-items")
+    public ApiResponse<List<MenuItemResponse>> getMenuItems(@PathVariable String id, Authentication authentication) {
+        return ApiResponse.success(storeService.getMenuItems(id, authentication != null ? authentication.getName() : null));
+    }
+
+    // GET /v1/stores/:id/menu-items-detail - includes option groups
+    @GetMapping("/{id}/menu-items-detail")
+    public ApiResponse<List<MenuItemDetailResponse>> getMenuItemsWithOptions(@PathVariable String id, Authentication authentication) {
+        return ApiResponse.success(storeService.getMenuItemsWithOptions(id, authentication != null ? authentication.getName() : null));
+    }
+
+    // C06: GET /v1/stores/:id/operating-hours
+    @GetMapping("/{id}/operating-hours")
+    public ApiResponse<List<OperatingHourResponse>> getOperatingHours(@PathVariable String id) {
+        return ApiResponse.success(storeService.getOperatingHours(id));
+    }
+
+    // C06: GET /v1/stores/:id/combos
+    @GetMapping("/{id}/combos")
+    public ApiResponse<List<ComboResponse>> getCombos(@PathVariable String id) {
+        return ApiResponse.success(storeService.getCombos(id));
+    }
+
+    // C13: GET /v1/stores/:id/reviews
+    @GetMapping("/{id}/reviews")
+    public ApiResponse<List<ReviewResponse>> getReviews(@PathVariable String id) {
+        return ApiResponse.success(storeService.getReviews(id));
+    }
+}
