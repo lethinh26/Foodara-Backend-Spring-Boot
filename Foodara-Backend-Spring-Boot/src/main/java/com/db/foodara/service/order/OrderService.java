@@ -32,11 +32,10 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * M05–M07 — Merchant order lifecycle:
- *   pending → confirmed → preparing → ready_for_pickup → picked_up → completed
+ *   pending → confirmed → ready_for_pickup → picked_up → delivered
  * (or cancelled at any merchant-controlled step).
  *
- * Status names are normalized to lowercase to stay aligned with the
- * frontend's expected enum / labels in {@code utils/constants.ts}.
+ * Publishes domain events to RabbitMQ for Notification Service.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,6 +50,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final OrderInventoryService orderInventoryService;
     private final VoucherUsageService voucherUsageService;
+    private final OrderEventPublisher eventPublisher;
 
     public List<MerchantOrderResponse> getOrders(String userId, String storeId) {
         ensureMerchantOwnsStore(userId, storeId);
@@ -67,11 +67,22 @@ public class OrderService {
     @Transactional
     public MerchantOrderResponse acceptOrder(String userId, String storeId, String orderId) {
         Order order = validateAndGetOrder(userId, storeId, orderId);
-        return transition(order, "confirmed", userId, "Merchant accepted order", o -> {
+        MerchantOrderResponse response = transition(order, "confirmed", userId, "Merchant confirmed", o -> {
             LocalDateTime now = LocalDateTime.now();
-            o.setConfirmedAt(now);
+            o.setPreparingAt(now);
             o.setStoreRespondedAt(now);
         });
+        // Publish event
+        eventPublisher.publish(Map.of(
+            "orderId", order.getId(),
+            "orderNumber", order.getOrderNumber(),
+            "storeId", order.getStoreId(),
+            "storeName", order.getStoreName(),
+            "customerId", order.getCustomerId(),
+            "newStatus", "confirmed",
+            "timestamp", LocalDateTime.now().toString()
+        ), "order.status");
+        return response;
     }
 
     @Transactional
@@ -93,32 +104,60 @@ public class OrderService {
         orderInventoryService.restoreStockForOrder(orderId);
         // Refund any voucher slots used by the order.
         voucherUsageService.rollbackForOrder(orderId);
+
+        // Notify notification service
+        eventPublisher.publish(Map.of(
+            "orderId", order.getId(),
+            "orderNumber", order.getOrderNumber(),
+            "customerId", order.getCustomerId(),
+            "storeId", order.getStoreId(),
+            "storeName", order.getStoreName(),
+            "cancelledBy", "store"
+        ), "order.cancelled");
+
         return response;
     }
 
-    @Transactional
-    public MerchantOrderResponse preparingOrder(String userId, String storeId, String orderId) {
-        Order order = validateAndGetOrder(userId, storeId, orderId);
-        return transition(order, "preparing", userId, "Kitchen started preparing", o -> o.setPreparingAt(LocalDateTime.now()));
-    }
 
     @Transactional
     public MerchantOrderResponse readyOrder(String userId, String storeId, String orderId) {
         Order order = validateAndGetOrder(userId, storeId, orderId);
-        return transition(order, "ready_for_pickup", userId, "Food is ready for driver", o -> o.setReadyAt(LocalDateTime.now()));
+        MerchantOrderResponse response = transition(order, "ready_for_pickup", userId, "Food is ready for driver", o -> {
+            LocalDateTime now = LocalDateTime.now();
+            if (o.getPreparingAt() == null) o.setPreparingAt(now);
+            o.setReadyAt(now);
+        });
+        eventPublisher.publish(Map.of(
+            "orderId", order.getId(),
+            "orderNumber", order.getOrderNumber(),
+            "storeId", order.getStoreId(),
+            "storeName", order.getStoreName(),
+            "customerId", order.getCustomerId(),
+            "oldStatus", "confirmed",
+            "newStatus", "ready_for_pickup",
+            "timestamp", LocalDateTime.now().toString()
+        ), "order.status");
+        return response;
     }
 
     @Transactional
     public MerchantOrderResponse handoverOrder(String userId, String storeId, String orderId) {
         Order order = validateAndGetOrder(userId, storeId, orderId);
-        return transition(order, "picked_up", userId, "Handed over to driver", o -> o.setPickedUpAt(LocalDateTime.now()));
+        MerchantOrderResponse response = transition(order, "picked_up", userId, "Handed over to driver", o -> o.setPickedUpAt(LocalDateTime.now()));
+        eventPublisher.publish(Map.of(
+            "orderId", order.getId(),
+            "orderNumber", order.getOrderNumber(),
+            "storeId", order.getStoreId(),
+            "storeName", order.getStoreName(),
+            "customerId", order.getCustomerId(),
+            "oldStatus", "ready_for_pickup",
+            "newStatus", "picked_up",
+            "timestamp", LocalDateTime.now().toString()
+        ), "order.status");
+        return response;
     }
 
-    @Transactional
-    public MerchantOrderResponse completedOrder(String userId, String storeId, String orderId) {
-        Order order = validateAndGetOrder(userId, storeId, orderId);
-        return transition(order, "completed", userId, "Merchant marked order as completed", o -> o.setCompletedAt(LocalDateTime.now()));
-    }
+
 
     // ---------- Internal helpers ----------
 
@@ -206,7 +245,6 @@ public class OrderService {
                 .readyAt(o.getReadyAt())
                 .pickedUpAt(o.getPickedUpAt())
                 .deliveredAt(o.getDeliveredAt())
-                .completedAt(o.getCompletedAt())
                 .cancelledAt(o.getCancelledAt())
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())

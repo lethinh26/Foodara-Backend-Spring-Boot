@@ -15,6 +15,32 @@ services:
     networks:
       - foodara-network
 
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: foodara-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: foodara
+      RABBITMQ_DEFAULT_PASS: foodara123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - foodara-network
+
+  notification-db:
+    image: postgis/postgis:17-master
+    container_name: foodara-notification-db
+    environment:
+      POSTGRES_DB: foodara_notification
+      POSTGRES_USER: foodara
+      POSTGRES_PASSWORD: root
+    ports:
+      - "3310:5432"
+    volumes:
+      - notification_pgdata:/var/lib/postgresql/data
+    networks:
+      - foodara-network
+
   api-gateway:
     build:
       context: ./Foodara-API-Gateway
@@ -24,6 +50,7 @@ services:
       - main-backend
       - driver-service
       - payment-service
+      - notification-service
     env_file:
       - ./Foodara-API-Gateway/.env
     environment:
@@ -33,6 +60,8 @@ services:
       - DRIVER_SERVICE_PORT=8082
       - PAYMENT_SERVICE_HOST=payment-service
       - PAYMENT_SERVICE_PORT=8083
+      - NOTIFICATION_SERVICE_HOST=notification-service
+      - NOTIFICATION_SERVICE_PORT=8084
     ports:
       - "8080:8080"
     networks:
@@ -45,12 +74,17 @@ services:
     container_name: foodara-main-backend
     depends_on:
       - db
+      - rabbitmq
     env_file:
       - ./Foodara-Backend-Spring-Boot/.env
     environment:
       - POSTGRESQL_DB_IP=db
       - POSTGRESQL_DB_PORT=5432
       - PAYMENT_SERVICE_URL=http://payment-service:8083
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=foodara
+      - RABBITMQ_PASS=foodara123
     ports:
       - "8081:8081"
     networks:
@@ -67,6 +101,28 @@ services:
       - MAIN_BACKEND_URL=http://main-backend:8081/api
     ports:
       - "8083:8083"
+    networks:
+      - foodara-network
+
+  notification-service:
+    build:
+      context: ./Foodara-Notification-Service
+      dockerfile: Dockerfile
+    container_name: foodara-notification-service
+    depends_on:
+      - notification-db
+      - rabbitmq
+    env_file:
+      - ./Foodara-Notification-Service/.env
+    environment:
+      - NOTIFICATION_DB_HOST=notification-db
+      - NOTIFICATION_DB_PORT=5432
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=foodara
+      - RABBITMQ_PASS=foodara123
+    ports:
+      - "8084:8084"
     networks:
       - foodara-network
 
@@ -93,3 +149,4 @@ networks:
 
 volumes:
   pgdata:
+  notification_pgdata:

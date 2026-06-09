@@ -48,7 +48,7 @@ public class Order {
 
     // Status
     @Column(name = "status", nullable = false)
-    private String status; // pending -> confirmed -> ... -> completed
+    private String status; // pending -> confirmed -> ready_for_pickup -> picked_up -> delivered
 
     // Delivery Address
     @Column(name = "delivery_address_id")

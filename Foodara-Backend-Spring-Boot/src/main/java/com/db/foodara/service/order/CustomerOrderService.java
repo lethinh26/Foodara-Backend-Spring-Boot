@@ -4,12 +4,7 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -53,7 +48,8 @@ import com.db.foodara.repository.store.OptionItemRepository;
 import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
-import com.db.foodara.service.websocket.WebSocketNotificationService;
+import com.db.foodara.entity.user.User;
+import com.db.foodara.service.order.OrderEventPublisher;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -84,7 +80,7 @@ public class CustomerOrderService {
     private final OptionGroupRepository optionGroupRepository;
     private final CheckoutService checkoutService;
     private final PaymentServiceClient paymentServiceClient;
-    private final WebSocketNotificationService webSocketNotificationService;
+    private final OrderEventPublisher eventPublisher;
     private final OrderInventoryService orderInventoryService;
     private final com.db.foodara.service.location.LocationService locationService;
     private final com.db.foodara.service.promotion.VoucherUsageService voucherUsageService;
@@ -96,9 +92,8 @@ public class CustomerOrderService {
     @Transactional
     public PlaceOrderResponse placeOrder(String userId, PlaceOrderRequest request) {
         // 1. Validate user exists
-        if (!userRepository.existsById(userId)) {
-            throw new AppException(ErrorCode.USER_NOT_FOUND);
-        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         // 2. Validate store
         Store store = storeRepository.findById(request.getStoreId())
@@ -263,14 +258,21 @@ public class CustomerOrderService {
             }
         }
 
-        // 11.5 Notify merchant in real time so the inbox/kitchen UI can show the new order + sound
+        // 11.5 Publish event to RabbitMQ for Notification Service
         try {
-            webSocketNotificationService.sendNewOrderToMerchant(
-                    savedOrder.getStoreId(),
-                    buildMerchantNotification(savedOrder, store)
-            );
+            eventPublisher.publish(Map.of(
+                "orderId", savedOrder.getId(),
+                "orderNumber", savedOrder.getOrderNumber(),
+                "customerId", userId,
+                "customerName", user.getFullName(),
+                "customerEmail", user.getEmail(),
+                "storeId", savedOrder.getStoreId(),
+                "storeName", store.getName(),
+                "totalAmount", savedOrder.getTotalAmount(),
+                "placedAt", savedOrder.getPlacedAt().toString()
+            ), "order.placed");
         } catch (Exception e) {
-            log.warn("Failed to push new-order notification for store {}: {}", savedOrder.getStoreId(), e.getMessage());
+            log.warn("Failed to publish order.placed event: {}", e.getMessage());
         }
 
         // 12. Build response
@@ -350,6 +352,17 @@ public class CustomerOrderService {
         orderInventoryService.restoreStockForOrder(saved.getId());
         // Refund the voucher slot + the user's wallet entry.
         voucherUsageService.rollbackForOrder(saved.getId());
+
+        // Notify notification service
+        eventPublisher.publish(Map.of(
+            "orderId", saved.getId(),
+            "orderNumber", saved.getOrderNumber(),
+            "customerId", saved.getCustomerId(),
+            "storeId", saved.getStoreId(),
+            "storeName", saved.getStoreName(),
+            "cancelledBy", "customer"
+        ), "order.cancelled");
+
         return saved;
     }
 

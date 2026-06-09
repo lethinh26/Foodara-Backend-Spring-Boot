@@ -62,13 +62,6 @@ public class OrderController {
         return ApiResponse.success(orderService.rejectOrder(authentication.getName(), storeId, orderId, request));
     }
 
-    @PutMapping("/{orderId}/preparing")
-    public ApiResponse<MerchantOrderResponse> preparingOrder(Authentication authentication,
-                                                             @PathVariable String storeId,
-                                                             @PathVariable String orderId) {
-        return ApiResponse.success(orderService.preparingOrder(authentication.getName(), storeId, orderId));
-    }
-
     @PutMapping("/{orderId}/ready")
     public ApiResponse<MerchantOrderResponse> readyOrder(Authentication authentication,
                                                          @PathVariable String storeId,
@@ -81,12 +74,5 @@ public class OrderController {
                                                             @PathVariable String storeId,
                                                             @PathVariable String orderId) {
         return ApiResponse.success(orderService.handoverOrder(authentication.getName(), storeId, orderId));
-    }
-
-    @PutMapping("/{orderId}/completed")
-    public ApiResponse<MerchantOrderResponse> completedOrder(Authentication authentication,
-                                                              @PathVariable String storeId,
-                                                              @PathVariable String orderId) {
-        return ApiResponse.success(orderService.completedOrder(authentication.getName(), storeId, orderId));
     }
 }

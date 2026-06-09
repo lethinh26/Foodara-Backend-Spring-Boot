@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 0; padding: 0; background: #f7f5f2; }
+        .container { max-width: 480px; margin: 20px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #FF6B35, #FF4500); padding: 28px 24px; text-align: center; }
+        .header .logo { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+        .body { padding: 32px 24px; }
+        .body h1 { font-size: 20px; margin: 0 0 16px; color: #1a1a1a; }
+        .body p { font-size: 15px; line-height: 1.6; color: #555; margin: 0 0 12px; }
+        .status-badge { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; margin: 16px 0; }
+        .info-box { background: #fff8f5; border: 1px solid #ffe0d4; border-radius: 12px; padding: 16px; margin: 20px 0; }
+        .info-box .label { font-size: 12px; text-transform: uppercase; color: #999; letter-spacing: 1px; }
+        .info-box .value { font-size: 16px; font-weight: 600; color: #1a1a1a; margin: 4px 0 12px; }
+        .footer { padding: 20px 24px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #f0f0f0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="logo">🍜 Foodara</div>
+    </div>
+    <div class="body">
+        <h1>Cập nhật trạng thái đơn hàng</h1>
+        <p>Đơn hàng <strong>#<span th:text="${orderNumber}">ABC123</span></strong> của bạn đã được cập nhật.</p>
+        <div class="status-badge" th:text="${newStatus}">Đã xác nhận</div>
+        <div class="info-box">
+            <div class="label">Từ</div>
+            <div class="value" th:text="${oldStatus}">Chờ xác nhận</div>
+            <div class="label">Đến</div>
+            <div class="value" th:text="${newStatus}">Đã xác nhận</div>
+            <div class="label">Nhà hàng</div>
+            <div class="value" th:text="${storeName}">Quán ngon</div>
+            <div class="label" th:if="${driverName != null and driverName != '-'}">Tài xế</div>
+            <div class="value" th:if="${driverName != null and driverName != '-'}" th:text="${driverName} + ' - ' + ${driverPhone}">Anh Tài - 0123456789</div>
+        </div>
+    </div>
+    <div class="footer">
+        Foodara — Giao đồ ăn nhanh nhất<br>
+        © 2026 Foodara. All rights reserved.
+    </div>
+</div>
+</body>
+</html>

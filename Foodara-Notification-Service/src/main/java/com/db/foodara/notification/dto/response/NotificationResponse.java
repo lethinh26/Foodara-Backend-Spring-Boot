@@ -1,20 +1,17 @@
-package com.db.foodara.dto.response.admin;
+package com.db.foodara.notification.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.*;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class AdminNotificationResponse {
+public class NotificationResponse {
     private String id;
     private String userId;
-    private String userName;
     private String title;
     private String body;
     private String imageUrl;

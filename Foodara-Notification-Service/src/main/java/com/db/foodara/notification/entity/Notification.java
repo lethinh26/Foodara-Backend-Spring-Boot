@@ -1,4 +1,4 @@
-package com.db.foodara.entity.notification;
+package com.db.foodara.notification.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -37,8 +37,8 @@ public class Notification {
     @Column(name = "reference_id")
     private String referenceId;
 
-    @Column(name = "channel", length = 20)
-    private String channel;
+    @Column(name = "channel", length = 50)
+    private String channel; // in_app, email, sms, push (comma-separated if multi)
 
     @Column(name = "is_read")
     private Boolean isRead;
@@ -59,7 +59,7 @@ public class Notification {
     protected void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (isRead == null) isRead = false;
-        if (channel == null) channel = "push";
+        if (channel == null) channel = "in_app";
         if (sentAt == null) sentAt = LocalDateTime.now();
     }
 }
