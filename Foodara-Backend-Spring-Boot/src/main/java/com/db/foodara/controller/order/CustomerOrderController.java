@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.db.foodara.dto.request.order.PlaceOrderRequest;
 import com.db.foodara.dto.response.ApiResponse;
+import com.db.foodara.dto.response.order.OrderTrackingResponse;
 import com.db.foodara.dto.response.order.PlaceOrderResponse;
 import com.db.foodara.entity.order.Order;
 import com.db.foodara.exception.AppException;
@@ -60,6 +61,15 @@ public class CustomerOrderController {
             @PathVariable String orderId
     ) {
         return ApiResponse.success(customerOrderService.getOrderStatus(requireUserId(authentication), orderId));
+    }
+
+    /** Map tracking — store, delivery, driver coords + route polyline for the order tracking map. */
+    @GetMapping("/{orderId}/tracking")
+    public ApiResponse<OrderTrackingResponse> getOrderTracking(
+            Authentication authentication,
+            @PathVariable String orderId
+    ) {
+        return ApiResponse.success(customerOrderService.getOrderTracking(requireUserId(authentication), orderId));
     }
 
 

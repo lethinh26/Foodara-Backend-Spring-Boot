@@ -21,6 +21,9 @@ public class CheckoutPreviewResponse {
     private BigDecimal subtotal;
     private BigDecimal subtotalAfterVoucher;
     private BigDecimal deliveryFee;
+    private BigDecimal distanceKm;
+    private Integer etaMinutes;
+    private BigDecimal surgeMultiplier;
     private BigDecimal platformFee;
 
     private BigDecimal platformDiscount;

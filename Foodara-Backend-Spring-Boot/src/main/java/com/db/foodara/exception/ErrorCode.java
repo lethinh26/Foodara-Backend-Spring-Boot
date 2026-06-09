@@ -134,7 +134,12 @@ public enum ErrorCode {
     VOUCHER_NOT_OWNED_BY_MERCHANT(2010, "Voucher is not owned by this merchant"),
     VOUCHER_CODE_EXISTED(2011, "Voucher code already exists"),
     CAMPAIGN_ALREADY_JOINED(3020, "Store has already joined this campaign"),
-    INVALID_DATE_RANGE(3021, "Invalid date range")
+    INVALID_DATE_RANGE(3021, "Invalid date range"),
+
+    // Mapbox / routing
+    MAPBOX_UNAVAILABLE(4000, "Map service is currently unavailable"),
+    MAPBOX_RATE_LIMITED(4001, "Map service rate limit exceeded"),
+    ROUTE_NOT_FOUND(4002, "No route found between the given coordinates")
 
     ;
     private int code;

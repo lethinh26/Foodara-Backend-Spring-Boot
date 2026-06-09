@@ -21,6 +21,8 @@ import com.db.foodara.client.PaymentServiceClient;
 import com.db.foodara.dto.request.order.CheckoutPreviewRequest;
 import com.db.foodara.dto.request.order.PlaceOrderRequest;
 import com.db.foodara.dto.response.order.CheckoutPreviewResponse;
+import com.db.foodara.dto.response.order.OrderTrackingResponse;
+import com.db.foodara.dto.response.location.DirectionsResponse;
 import com.db.foodara.dto.response.order.PlaceOrderResponse;
 import com.db.foodara.entity.order.Cart;
 import com.db.foodara.entity.order.CartItem;
@@ -84,6 +86,7 @@ public class CustomerOrderService {
     private final PaymentServiceClient paymentServiceClient;
     private final WebSocketNotificationService webSocketNotificationService;
     private final OrderInventoryService orderInventoryService;
+    private final com.db.foodara.service.location.LocationService locationService;
     private final com.db.foodara.service.promotion.VoucherUsageService voucherUsageService;
 
     @Value("${app.frontend.base-url:http://localhost:5173}")
@@ -175,12 +178,12 @@ public class CustomerOrderService {
                     .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP));
         }
 
-        // Delivery distance — Haversine between store and delivery address (in km, 2 decimals)
-        BigDecimal distanceKm = haversineKm(
-                store.getLatitude(), store.getLongitude(),
-                address.getLatitude(), address.getLongitude());
-        if (distanceKm != null) {
-            order.setDeliveryDistanceKm(distanceKm);
+        // Delivery distance & ETA from preview (Mapbox-backed quote)
+        if (preview.getDistanceKm() != null) {
+            order.setDeliveryDistanceKm(preview.getDistanceKm());
+        }
+        if (preview.getEtaMinutes() != null) {
+            order.setEstimatedDeliveryTime(preview.getEtaMinutes());
         }
 
         // Vouchers
@@ -195,7 +198,7 @@ public class CustomerOrderService {
         order.setPlacedAt(placedAt);
         order.setStoreResponseDeadline(placedAt.plusMinutes(STORE_RESPONSE_TIMEOUT_MINUTES));
         order.setEstimatedPrepTime(20);
-        order.setEstimatedDeliveryTime(15);
+        if (order.getEstimatedDeliveryTime() == null) order.setEstimatedDeliveryTime(15);
         order.setEstimatedTotalTime(35);
 
         // Pickup code (merchant -> driver) and OTP (customer -> driver)
@@ -466,6 +469,49 @@ public class CustomerOrderService {
     }
 
     /**
+     * Get map tracking data for an order — store coords, delivery coords,
+     * driver coords (if assigned), and a route polyline from store → delivery.
+     */
+    public OrderTrackingResponse getOrderTracking(String userId, String orderId) {
+        Order order = orderRepository.findByIdAndCustomerId(orderId, userId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        OrderTrackingResponse.OrderTrackingResponseBuilder builder = OrderTrackingResponse.builder()
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .status(order.getStatus())
+                .storeId(order.getStoreId())
+                .storeName(order.getStoreName())
+                .storeLatitude(order.getStoreLatitude())
+                .storeLongitude(order.getStoreLongitude())
+                .deliveryLatitude(order.getDeliveryLatitude())
+                .deliveryLongitude(order.getDeliveryLongitude());
+
+        // Driver info if assigned
+        if (org.springframework.util.StringUtils.hasText(order.getDriverId())) {
+            builder.driverId(order.getDriverId());
+            // Driver lat/lng not available in monolith — will come from Driver Service later
+        }
+
+        // Route from store to delivery
+        if (order.getStoreLatitude() != null && order.getStoreLongitude() != null
+                && order.getDeliveryLatitude() != null && order.getDeliveryLongitude() != null) {
+            try {
+                DirectionsResponse dir = locationService.directions(
+                        order.getStoreLatitude(), order.getStoreLongitude(),
+                        order.getDeliveryLatitude(), order.getDeliveryLongitude());
+                builder.distanceKm(dir.distanceKm())
+                        .etaMinutes(dir.durationMinutes())
+                        .polyline(dir.polyline());
+            } catch (Exception e) {
+                log.warn("Failed to get directions for order {}: {}", orderId, e.getMessage());
+            }
+        }
+
+        return builder.build();
+    }
+
+    /**
      * Update payment status (called by IPN handler)
      */
     @Transactional
@@ -642,18 +688,6 @@ public class CustomerOrderService {
      * Great-circle distance using the Haversine formula.
      * Returns {@code null} when either coordinate is missing so callers can decide what to do.
      */
-    private BigDecimal haversineKm(BigDecimal lat1, BigDecimal lon1, BigDecimal lat2, BigDecimal lon2) {
-        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
-        double earthRadiusKm = 6371.0;
-        double dLat = Math.toRadians(lat2.doubleValue() - lat1.doubleValue());
-        double dLon = Math.toRadians(lon2.doubleValue() - lon1.doubleValue());
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1.doubleValue()))
-                * Math.cos(Math.toRadians(lat2.doubleValue()))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return BigDecimal.valueOf(earthRadiusKm * c).setScale(2, java.math.RoundingMode.HALF_UP);
-    }
 
     private String buildAddressSnapshot(UserAddress address) {
         // Must return valid JSON since column is jsonb

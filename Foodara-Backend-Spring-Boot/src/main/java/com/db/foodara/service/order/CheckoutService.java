@@ -15,6 +15,7 @@ import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.order.CartItemRepository;
 import com.db.foodara.repository.order.CartRepository;
 import com.db.foodara.repository.store.StoreRepository;
+import com.db.foodara.service.order.DeliveryQuoteService.DeliveryQuote;
 import com.db.foodara.repository.user.UserAddressRepository;
 import com.db.foodara.repository.user.UserRepository;
 import com.db.foodara.service.promotion.VoucherService;
@@ -30,10 +31,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CheckoutService {
 
-    private static final BigDecimal BASE_DELIVERY_FEE = BigDecimal.valueOf(15000);
-    private static final BigDecimal EXTRA_FEE_PER_KM = BigDecimal.valueOf(3000);
-    private static final BigDecimal FREE_BASE_DISTANCE_KM = BigDecimal.valueOf(2);
-    private static final BigDecimal MAX_DELIVERY_FEE = BigDecimal.valueOf(60000);
     private static final BigDecimal PLATFORM_FEE_PERCENT = BigDecimal.valueOf(0.03);
     private static final BigDecimal PLATFORM_FEE_MIN = BigDecimal.valueOf(2000);
     private static final BigDecimal PLATFORM_FEE_MAX = BigDecimal.valueOf(10000);
@@ -45,6 +42,7 @@ public class CheckoutService {
     private final CartItemRepository cartItemRepository;
     private final CartService cartService;
     private final VoucherService voucherService;
+    private final DeliveryQuoteService deliveryQuoteService;
 
     public CheckoutPreviewResponse preview(String userId, CheckoutPreviewRequest request) {
         ensureUserExists(userId);
@@ -97,40 +95,45 @@ public class CheckoutService {
         return calculateDeliveryFee(userId, storeId, addressId);
     }
 
-    private CheckoutDeliveryFeeResponse calculateDeliveryFee(String userId, String storeId, String addressId) {
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new AppException(ErrorCode.STORE_NOT_FOUND));
-        UserAddress address = resolveAddress(userId, addressId);
+    public CheckoutDeliveryFeeResponse getDeliveryFeeByCoords(String storeId, BigDecimal lat, BigDecimal lng) {
+        DeliveryQuote quote = deliveryQuoteService.quoteByCoords(storeId, lat, lng);
+        return CheckoutDeliveryFeeResponse.builder()
+                .storeId(quote.storeId())
+                .addressId(null)
+                .distanceKm(quote.distanceKm())
+                .deliveryFee(quote.deliveryFee())
+                .etaMinutes(quote.etaMinutes())
+                .surgeMultiplier(quote.surgeMultiplier())
+                .build();
+    }
 
-        BigDecimal distanceKm = BigDecimal.ZERO;
-        BigDecimal fee = BASE_DELIVERY_FEE;
-
-        if (address != null
-                && address.getLatitude() != null
-                && address.getLongitude() != null
-                && store.getLatitude() != null
-                && store.getLongitude() != null) {
-            distanceKm = haversineKm(
-                    store.getLatitude().doubleValue(),
-                    store.getLongitude().doubleValue(),
-                    address.getLatitude().doubleValue(),
-                    address.getLongitude().doubleValue()
-            );
-
-            BigDecimal extraDistance = distanceKm.subtract(FREE_BASE_DISTANCE_KM);
-            if (extraDistance.compareTo(BigDecimal.ZERO) > 0) {
-                fee = fee.add(extraDistance.multiply(EXTRA_FEE_PER_KM));
-            }
-            if (fee.compareTo(MAX_DELIVERY_FEE) > 0) {
-                fee = MAX_DELIVERY_FEE;
+    public java.util.List<CheckoutDeliveryFeeResponse> getDeliveryFeeBatch(java.util.List<String> storeIds, BigDecimal lat, BigDecimal lng) {
+        java.util.List<DeliveryQuote> quotes = deliveryQuoteService.quoteBatch(storeIds, lat, lng);
+        java.util.List<CheckoutDeliveryFeeResponse> out = new java.util.ArrayList<>();
+        for (int i = 0; i < storeIds.size(); i++) {
+            DeliveryQuote q = i < quotes.size() ? quotes.get(i) : null;
+            if (q == null) {
+                out.add(CheckoutDeliveryFeeResponse.builder().storeId(storeIds.get(i)).build());
+            } else {
+                out.add(CheckoutDeliveryFeeResponse.builder()
+                        .storeId(q.storeId()).addressId(null)
+                        .distanceKm(q.distanceKm()).deliveryFee(q.deliveryFee())
+                        .etaMinutes(q.etaMinutes()).surgeMultiplier(q.surgeMultiplier())
+                        .build());
             }
         }
+        return out;
+    }
 
+    private CheckoutDeliveryFeeResponse calculateDeliveryFee(String userId, String storeId, String addressId) {
+        DeliveryQuote quote = deliveryQuoteService.quote(storeId, userId, addressId);
         return CheckoutDeliveryFeeResponse.builder()
-                .storeId(storeId)
-                .addressId(address != null ? address.getId() : null)
-                .distanceKm(scale(distanceKm.max(BigDecimal.ZERO)))
-                .deliveryFee(scale(fee))
+                .storeId(quote.storeId())
+                .addressId(quote.addressId())
+                .distanceKm(quote.distanceKm())
+                .deliveryFee(quote.deliveryFee())
+                .etaMinutes(quote.etaMinutes())
+                .surgeMultiplier(quote.surgeMultiplier())
                 .build();
     }
 
@@ -189,16 +192,6 @@ public class CheckoutService {
         }
     }
 
-    private BigDecimal haversineKm(double lat1, double lon1, double lat2, double lon2) {
-        double earthRadius = 6371.0;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return BigDecimal.valueOf(earthRadius * c);
-    }
 
     private BigDecimal amount(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
@@ -208,3 +201,6 @@ public class CheckoutService {
         return value.setScale(2, RoundingMode.HALF_UP);
     }
 }
+
+
+

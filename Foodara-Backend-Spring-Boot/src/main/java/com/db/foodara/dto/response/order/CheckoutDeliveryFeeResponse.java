@@ -17,4 +17,6 @@ public class CheckoutDeliveryFeeResponse {
     private String addressId;
     private BigDecimal distanceKm;
     private BigDecimal deliveryFee;
+    private Integer etaMinutes;
+    private BigDecimal surgeMultiplier;
 }

@@ -27,6 +27,20 @@ public class CheckoutController {
         return ApiResponse.success(checkoutService.preview(requireUserId(authentication), request));
     }
 
+    @PostMapping("/delivery-fee/batch")
+    public ApiResponse<java.util.List<CheckoutDeliveryFeeResponse>> getDeliveryFeeBatch(
+            @Valid @RequestBody com.db.foodara.dto.request.order.DeliveryFeeBatchRequest request) {
+        return ApiResponse.success(checkoutService.getDeliveryFeeBatch(request.getStoreIds(), request.getLat(), request.getLng()));
+    }
+
+    @GetMapping("/delivery-fee/by-coords")
+    public ApiResponse<CheckoutDeliveryFeeResponse> getDeliveryFeeByCoords(
+            @RequestParam String storeId,
+            @RequestParam java.math.BigDecimal lat,
+            @RequestParam java.math.BigDecimal lng) {
+        return ApiResponse.success(checkoutService.getDeliveryFeeByCoords(storeId, lat, lng));
+    }
+
     @GetMapping("/delivery-fee")
     public ApiResponse<CheckoutDeliveryFeeResponse> getDeliveryFee(
             Authentication authentication,
@@ -43,3 +57,5 @@ public class CheckoutController {
         return authentication.getName();
     }
 }
+
+
