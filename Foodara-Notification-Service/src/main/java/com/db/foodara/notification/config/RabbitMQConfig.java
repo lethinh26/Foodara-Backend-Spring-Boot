@@ -30,6 +30,8 @@ public class RabbitMQConfig {
     public static final String ORDER_CANCELLED_KEY = "order.cancelled";
     public static final String SYSTEM_NOTIFY_KEY = "system.notify";
     public static final String USER_REGISTERED_KEY = "user.registered";
+    public static final String REFUND_VOUCHER_KEY = "refund.voucher";
+    public static final String REFUND_BANK_KEY = "refund.bank";
 
     @Bean
     public TopicExchange foodaraExchange() {
@@ -67,6 +69,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue refundQueue() {
+        return QueueBuilder.durable("foodara.notification.refund").build();
+    }
+
+    @Bean
     public Binding orderPlacedBinding(Queue orderPlacedQueue, TopicExchange exchange) {
         return BindingBuilder.bind(orderPlacedQueue).to(exchange).with(ORDER_PLACED_KEY);
     }
@@ -94,6 +101,16 @@ public class RabbitMQConfig {
     @Bean
     public Binding userRegisteredBinding(Queue userRegisteredQueue, TopicExchange exchange) {
         return BindingBuilder.bind(userRegisteredQueue).to(exchange).with(USER_REGISTERED_KEY);
+    }
+
+    @Bean
+    public Binding refundVoucherBinding(Queue refundQueue, TopicExchange exchange) {
+        return BindingBuilder.bind(refundQueue).to(exchange).with(REFUND_VOUCHER_KEY);
+    }
+
+    @Bean
+    public Binding refundBankBinding(Queue refundQueue, TopicExchange exchange) {
+        return BindingBuilder.bind(refundQueue).to(exchange).with(REFUND_BANK_KEY);
     }
 
     @Bean

@@ -17,6 +17,10 @@ public class RabbitMQConfig {
 
     public static final String EXCHANGE = "foodara.events";
 
+    // Routing keys
+    public static final String REFUND_VOUCHER_KEY = "refund.voucher";
+    public static final String REFUND_BANK_KEY = "refund.bank";
+
     @Bean
     public TopicExchange foodaraExchange() {
         return new TopicExchange(EXCHANGE);

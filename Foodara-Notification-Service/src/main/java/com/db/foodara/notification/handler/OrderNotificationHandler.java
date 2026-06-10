@@ -250,6 +250,35 @@ public class OrderNotificationHandler {
             """.formatted(customerName, orderNumber, storeName != null ? storeName : "quan", orderNumber);
     }
 
+    @SuppressWarnings("unchecked")
+    @RabbitListener(queues = "foodara.notification.refund")
+    public void handleRefund(Map<String, Object> event) {
+        String routingKey = (String) event.get("amqp_receivedRoutingKey");
+        log.info("Received refund event: routingKey={}, order={}", routingKey, event.get("orderNumber"));
+
+        String orderNumber = (String) event.get("orderNumber");
+        String customerId = (String) event.get("customerId");
+        String type = (String) event.get("type");
+        Object amountObj = event.get("amount");
+        String amountStr = amountObj != null ? amountObj.toString() : "0";
+
+        String title;
+        String body;
+        if ("voucher".equals(type)) {
+            String voucherCode = (String) event.get("voucherCode");
+            title = "Hoàn tiền đơn #" + orderNumber + " - Voucher đã được tạo";
+            body = "Voucher " + voucherCode + " trị giá " + amountStr + "đ đã được thêm vào ví của bạn. "
+                 + "Dùng cho đơn hàng tiếp theo trong 30 ngày.";
+        } else {
+            title = "Hoàn tiền đơn #" + orderNumber + " - Đã ghi nhận";
+            body = "Yêu cầu hoàn " + amountStr + "đ đã được ghi nhận. Chúng tôi sẽ xử lý trong 24h.";
+        }
+
+        if (customerId != null) {
+            sendToUser(customerId, title, body, "refund", "refund", null, "in_app", null);
+        }
+    }
+
     private String translateStatus(String status) {
         return switch (status != null ? status.toLowerCase() : "") {
             case "pending" -> "Ch\u1edd x\u00e1c nh\u1eadn";

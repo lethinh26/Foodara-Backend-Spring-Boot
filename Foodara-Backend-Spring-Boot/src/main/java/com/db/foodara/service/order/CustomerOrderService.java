@@ -236,29 +236,7 @@ public class CustomerOrderService {
         cartItemRepository.deleteAll(cartItems);
         cartRepository.delete(cart);
 
-        // 11. Handle SePay checkout for QR payment
-        String checkoutUrl = null;
-        if ("qr".equalsIgnoreCase(request.getPaymentMethod())) {
-            String gatewayBaseUrl = "http://localhost:8080/api"; // Callback goes through API Gateway → payment-service
-            String successUrl = gatewayBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=success";
-            String errorUrl = gatewayBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=error";
-            String cancelUrl = gatewayBaseUrl + "/v1/payment/sepay/callback?orderId=" + savedOrder.getId() + "&status=cancel";
-
-            try {
-                checkoutUrl = paymentServiceClient.createCheckout(
-                        savedOrder.getId(),
-                        orderNumber,
-                        preview.getTotalAmount(),
-                        "Thanh toán đơn hàng " + orderNumber + " - Foodara",
-                        successUrl, errorUrl, cancelUrl
-                );
-            } catch (Exception e) {
-                log.error("Failed to create SePay checkout for order {}", orderNumber, e);
-                // Still return order — customer can retry payment
-            }
-        }
-
-        // 11.5 Publish event to RabbitMQ for Notification Service
+        // 11. Publish event to RabbitMQ for Notification Service
         try {
             eventPublisher.publish(Map.of(
                 "orderId", savedOrder.getId(),
@@ -287,7 +265,6 @@ public class CustomerOrderService {
                 .platformFee(savedOrder.getPlatformFee())
                 .voucherDiscount(savedOrder.getVoucherDiscount())
                 .totalAmount(savedOrder.getTotalAmount())
-                .checkoutUrl(checkoutUrl)
                 .placedAt(savedOrder.getPlacedAt())
                 .estimatedDeliveryTime(savedOrder.getEstimatedTotalTime())
                 .build();
@@ -535,6 +512,7 @@ public class CustomerOrderService {
         orderRepository.save(order);
         log.info("Updated payment status for order {} to {}", orderNumber, paymentStatus);
     }
+
 
     // ============================================================
     // Snapshot helpers

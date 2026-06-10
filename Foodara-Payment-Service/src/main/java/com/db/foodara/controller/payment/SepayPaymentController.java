@@ -3,11 +3,14 @@ package com.db.foodara.controller.payment;
 import com.db.foodara.client.MainBackendClient;
 import com.db.foodara.service.payment.SepayService;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.BufferedReader;
 import java.util.Map;
 
 @RestController
@@ -18,57 +21,55 @@ public class SepayPaymentController {
 
     private final SepayService sepayService;
     private final MainBackendClient mainBackendClient;
+    private final ObjectMapper objectMapper;
 
-    /**
-     * IPN (Instant Payment Notification) endpoint.
-     * SePay calls this when a payment status changes.
-     * Must return HTTP 200 to acknowledge receipt.
-     */
-    @PostMapping("/ipn")
-    public ResponseEntity<Map<String, Object>> handleIpn(
-            @RequestHeader(value = "X-Secret-Key", required = false) String secretKey,
-            @RequestBody JsonNode body
+    @PostMapping("/webhook")
+    public ResponseEntity<Map<String, Object>> handleWebhook(
+            @RequestHeader(value = "X-SePay-Signature", required = false) String signatureHeader,
+            @RequestHeader(value = "X-SePay-Timestamp", required = false) String timestamp,
+            HttpServletRequest servletRequest
     ) {
-        log.info("Received SePay IPN: {}", body.toString());
+        try {
+            StringBuilder rawBody = new StringBuilder();
+            BufferedReader reader = servletRequest.getReader();
+            String line;
+            while ((line = reader.readLine()) != null) rawBody.append(line);
+            String payload = rawBody.toString();
 
-        // Verify secret key if configured
-        if (!sepayService.verifyIpn(secretKey)) {
-            log.warn("SePay IPN verification failed");
-            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Unauthorized"));
-        }
+            String dataToSign = (timestamp != null ? timestamp : "") + "." + payload;
 
-        String notificationType = body.has("notification_type") ? body.get("notification_type").asText() : "";
-
-        if ("ORDER_PAID".equals(notificationType)) {
-            JsonNode orderNode = body.get("order");
-            if (orderNode != null && orderNode.has("order_invoice_number")) {
-                String invoiceNumber = orderNode.get("order_invoice_number").asText();
-                log.info("SePay IPN: ORDER_PAID for invoice {}", invoiceNumber);
-                try {
-                    mainBackendClient.updatePaymentStatus(invoiceNumber, "paid");
-                } catch (Exception e) {
-                    log.error("Failed to update payment status for invoice {}", invoiceNumber, e);
-                }
+            String cleanSignature = signatureHeader;
+            if (cleanSignature != null && cleanSignature.startsWith("sha256=")) {
+                cleanSignature = cleanSignature.substring(7);
             }
+
+            if (!sepayService.verifySignature(dataToSign, cleanSignature)) {
+                log.warn("SePay webhook: invalid signature");
+                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid signature"));
+            }
+
+            JsonNode body = objectMapper.readTree(payload);
+            String content = body.has("content") ? body.get("content").asText() : "";
+            long transferAmount = body.has("transferAmount") ? body.get("transferAmount").asLong() : 0;
+
+            log.info("SePay webhook: amount={}, content={}", transferAmount, content);
+
+            // Extract order number from content (e.g., FD-260609-830)
+            String orderNumber = sepayService.extractOrderNumber(content);
+
+            if (orderNumber == null) {
+                log.info("SePay webhook: no order number found in content");
+                return ResponseEntity.ok(Map.of("success", true, "message", "No Foodara order number"));
+            }
+
+            log.info("SePay webhook: matched order {} — marking as paid", orderNumber);
+            mainBackendClient.updatePaymentStatus(orderNumber, "paid");
+
+            return ResponseEntity.ok(Map.of("success", true, "orderNumber", orderNumber));
+
+        } catch (Exception e) {
+            log.error("SePay webhook error", e);
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Internal error"));
         }
-
-        return ResponseEntity.ok(Map.of("success", true));
-    }
-
-    /**
-     * Callback endpoint — SePay redirects customer here after payment.
-     * This redirects to the frontend order tracking page.
-     */
-    @GetMapping("/callback")
-    public ResponseEntity<Void> handleCallback(
-            @RequestParam String orderId,
-            @RequestParam String status
-    ) {
-        // Redirect to frontend order page with payment status
-        // TODO: Ensure this URL can be dynamically configured if needed
-        String frontendUrl = "http://localhost:5173/customer/order/" + orderId + "?payment=" + status;
-        return ResponseEntity.status(302)
-                .header("Location", frontendUrl)
-                .build();
     }
 }

@@ -267,9 +267,6 @@ public class CartService {
         }
 
         BigDecimal shortfall = minOrderAmount.subtract(subtotal).max(BigDecimal.ZERO);
-        if (shortfall.compareTo(BigDecimal.ZERO) > 0) {
-            issues.add(issue("MIN_ORDER_NOT_REACHED", "Don hang chua dat gia tri toi thieu", null));
-        }
 
         return CartValidationResponse.builder()
                 .valid(issues.isEmpty())

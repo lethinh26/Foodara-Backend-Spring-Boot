@@ -28,7 +28,7 @@ public class PlaceOrderResponse {
     private BigDecimal voucherDiscount;
     private BigDecimal totalAmount;
 
-    // SePay checkout URL (null if COD)
+    // SePay checkout URL (null if COD) — kept for backward compatibility
     private String checkoutUrl;
 
     // Timestamps

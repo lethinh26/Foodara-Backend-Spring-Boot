@@ -11,19 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "app.sepay")
 public class SepayConfig {
 
-    private String merchantId;
     private String secretKey;
-    private String mode = "sandbox";
-
-
-    public String getBaseUrl() {
-        if ("production".equalsIgnoreCase(mode)) {
-            return "https://pay.sepay.vn";
-        }
-        return "https://pgapi-sandbox.sepay.vn";
-    }
-
-    public String getCheckoutUrl() {
-        return getBaseUrl() + "/v1/checkout/init";
-    }
+    private String bankCode = "MBBank";
+    private String accountNumber = "0943941773";
+    private String qrTemplate = "compact";
 }

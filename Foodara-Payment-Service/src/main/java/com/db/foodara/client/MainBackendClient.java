@@ -18,14 +18,18 @@ public class MainBackendClient {
     @Value("${app.main-backend.url}")
     private String mainBackendUrl;
 
-    public void updatePaymentStatus(String invoiceNumber, String status) {
-        String url = mainBackendUrl + "/v1/internal/orders/" + invoiceNumber + "/payment-status";
-        log.info("Calling Main Backend to update payment status: {}", url);
+    /**
+     * Notify main backend that an order has been paid.
+     * orderNumber doubles as the SePay transfer code.
+     */
+    public void updatePaymentStatus(String orderNumber, String status) {
+        String url = mainBackendUrl + "/v1/internal/orders/" + orderNumber + "/payment-status";
+        log.info("Calling Main Backend to update payment: {} → {}", url, status);
         try {
             restTemplate.put(url, Map.of("status", status));
-            log.info("Successfully updated payment status for invoice: {}", invoiceNumber);
+            log.info("Payment updated for order {}", orderNumber);
         } catch (Exception e) {
-            log.error("Failed to update payment status via internal API for invoice {}", invoiceNumber, e);
+            log.error("Failed to update payment for order {}", orderNumber, e);
         }
     }
 }

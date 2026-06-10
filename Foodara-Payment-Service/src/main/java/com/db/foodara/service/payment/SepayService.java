@@ -1,25 +1,14 @@
 package com.db.foodara.service.payment;
 
 import com.db.foodara.config.SepayConfig;
-import com.db.foodara.exception.AppException;
-import com.db.foodara.exception.ErrorCode;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.security.MessageDigest;
 
 @Service
 @RequiredArgsConstructor
@@ -27,80 +16,52 @@ import java.util.Map;
 public class SepayService {
 
     private final SepayConfig sepayConfig;
-    private final ObjectMapper objectMapper;
 
-    public String createCheckout(String orderId, String orderNumber, BigDecimal amount,
-        String description, String successUrl, String errorUrl, String cancelUrl) {
-        try {
-            Map<String, Object> checkoutData = new LinkedHashMap<>();
-            checkoutData.put("currency", "VND");
-            checkoutData.put("order_invoice_number", orderNumber);
-            checkoutData.put("order_amount", amount.intValue());
-            checkoutData.put("operation", "PURCHASE");
-            checkoutData.put("order_description", description);
-            checkoutData.put("success_url", successUrl);
-            checkoutData.put("error_url", errorUrl);
-            checkoutData.put("cancel_url", cancelUrl);
-
-            String dataToSign = buildSignatureString(checkoutData);
-            String signature = hmacSha256(dataToSign, sepayConfig.getSecretKey());
-            checkoutData.put("signature", signature);
-
-            String requestBody = objectMapper.writeValueAsString(checkoutData);
-
-            // Basic Auth header
-            String auth = sepayConfig.getMerchantId() + ":" + sepayConfig.getSecretKey();
-            String basicAuth = "Basic " + Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(sepayConfig.getCheckoutUrl()))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", basicAuth)
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200 || response.statusCode() == 201) {
-                JsonNode responseNode = objectMapper.readTree(response.body());
-                if (responseNode.has("checkout_url")) {
-                    return responseNode.get("checkout_url").asText();
-                }
-                if (responseNode.has("data") && responseNode.get("data").has("checkout_url")) {
-                    return responseNode.get("data").get("checkout_url").asText();
-                }
-                log.warn("SePay response does not contain checkout_url: {}", response.body());
-                return null;
-            } else {
-                log.error("SePay checkout failed: status={}, body={}", response.statusCode(), response.body());
-                throw new AppException(ErrorCode.PAYMENT_FAILED);
-            }
-        } catch (AppException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("SePay checkout error", e);
-            throw new AppException(ErrorCode.PAYMENT_FAILED);
-        }
+    /**
+     * Build the SePay QR image URL.
+     * Uses orderNumber as the bank transfer description.
+     */
+    public String getQrUrl(String orderNumber, java.math.BigDecimal amount) {
+        long amt = amount == null ? 0L : amount.longValue();
+        return "https://qr.sepay.vn/img"
+            + "?bank=" + sepayConfig.getBankCode()
+            + "&acc=" + sepayConfig.getAccountNumber()
+            + "&template=" + sepayConfig.getQrTemplate()
+            + "&des=" + orderNumber
+            + "&amount=" + amt;
     }
 
     /**
-     * Verify IPN webhook authenticity using secret key header
+     * Verify HMAC-SHA256 signature from X-SePay-Signature header.
+     * The signed string is "{timestamp}.{raw_body}".
      */
-    public boolean verifyIpn(String secretKeyHeader) {
-        if (secretKeyHeader == null || secretKeyHeader.isBlank()) {
-            return true; // No auth configured on SePay side
+    public boolean verifySignature(String dataToSign, String signatureHeader) {
+        if (signatureHeader == null || signatureHeader.isBlank()) {
+            log.warn("Missing X-SePay-Signature header");
+            return false;
         }
-        return sepayConfig.getSecretKey().equals(secretKeyHeader);
+        String expected = hmacSha256(dataToSign, sepayConfig.getSecretKey());
+        return MessageDigest.isEqual(expected.getBytes(), signatureHeader.getBytes());
     }
 
-    private String buildSignatureString(Map<String, Object> data) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(data.getOrDefault("currency", ""));
-        sb.append(data.getOrDefault("order_invoice_number", ""));
-        sb.append(data.getOrDefault("order_amount", ""));
-        sb.append(data.getOrDefault("operation", ""));
-        return sb.toString();
+    /**
+     * Parse SePay transfer content to find Foodara order number.
+     * Banks often strip dashes, so we match "FD" + 9 digits (no dashes)
+     * and normalize to FD-YYMMDD-NNN format.
+     * Example: "FD260610064" → "FD-260610-064"
+     */
+    public String extractOrderNumber(String transferContent) {
+        if (transferContent == null || transferContent.isBlank()) {
+            return null;
+        }
+        // Match FD followed by 9 digits anywhere in the content
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("FD(\\d{9})", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher = pattern.matcher(transferContent.toUpperCase());
+        if (matcher.find()) {
+            String digits = matcher.group(1); // e.g. "260610064"
+            return "FD-" + digits.substring(0, 6) + "-" + digits.substring(6);
+        }
+        return null;
     }
 
     private String hmacSha256(String data, String key) {
