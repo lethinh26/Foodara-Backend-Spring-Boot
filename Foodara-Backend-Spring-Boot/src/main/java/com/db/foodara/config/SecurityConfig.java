@@ -52,6 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/payments/webhook").permitAll()
                         .requestMatchers("/v1/internal/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

@@ -49,6 +49,9 @@ public class Notification {
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
+    @Column(name = "recipient_email", length = 320)
+    private String recipientEmail; // Email của người nhận (dùng cho EmailChannel)
+
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 

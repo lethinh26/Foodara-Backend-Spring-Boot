@@ -143,6 +143,28 @@ services:
     networks:
       - foodara-network
 
+  cloudflared:
+    image: alpine:3.21
+    container_name: foodara-cloudflared
+    command: >
+      sh -c "
+        apk add --no-cache curl jq &&
+        wget -qO /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 &&
+        chmod +x /tmp/cloudflared &&
+        /tmp/cloudflared tunnel --no-autoupdate --metrics 0.0.0.0:20000 --url http://api-gateway:8080 2>&1 | tee /shared/tunnel.log &
+        sleep 8 &&
+        TUNNEL_URL=$$(grep -oP 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' /shared/tunnel.log | head -1) &&
+        echo TUNNEL_URL=$$TUNNEL_URL > /shared/tunnel_url.env &&
+        echo Tunnel ready: $$TUNNEL_URL &&
+        tail -f /dev/null
+      "
+    depends_on:
+      - api-gateway
+    networks:
+      - foodara-network
+    volumes:
+      - tunnel_data:/shared
+
 networks:
   foodara-network:
     driver: bridge
@@ -150,3 +172,4 @@ networks:
 volumes:
   pgdata:
   notification_pgdata:
+  tunnel_data:

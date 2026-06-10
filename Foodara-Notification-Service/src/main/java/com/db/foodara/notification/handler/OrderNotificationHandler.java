@@ -56,7 +56,7 @@ public class OrderNotificationHandler {
                        "totalAmount", totalAmount != null ? totalAmount.toString() : "0"));
 
         if (customerId != null) {
-            sendToUser(customerId, customerTitle, customerBody, "order", "order", orderId, "in_app,email");
+            sendToUser(customerId, customerTitle, customerBody, "order", "order", orderId, "in_app", customerEmail);
         }
 
         // 3. Notify merchant (in-app) — persistence so bell shows
@@ -96,7 +96,19 @@ public class OrderNotificationHandler {
                        "driverPhone", driverPhone));
 
         if (customerId != null) {
-            sendToUser(customerId, title, body, "order_status", "order", orderId, "in_app,email");
+            // DELIVERED: send special email
+            if ("delivered".equalsIgnoreCase(newStatus) && event.get("customerEmail") != null) {
+                String deliveredTitle = "🎉 Đơn hàng #" + orderNumber + " đã giao thành công!";
+                String emailHtml = generateDeliveredEmail(
+                        orderNumber, storeName,
+                        (String) event.getOrDefault("customerName", "Khách"),
+                        (String) event.get("customerEmail"));
+                sendToUser(customerId, deliveredTitle, emailHtml, "order_status", "order", orderId, "email", (String) event.get("customerEmail"));
+                // Also send in-app notification
+                sendToUser(customerId, title, body, "order_status", "order", orderId, "in_app");
+            } else {
+                sendToUser(customerId, title, body, "order_status", "order", orderId, "in_app");
+            }
         }
 
         // Also notify merchant of status change
@@ -125,7 +137,7 @@ public class OrderNotificationHandler {
                        "paymentMethod", paymentMethod));
 
         if (customerId != null) {
-            sendToUser(customerId, title, body, "payment", "order", orderId, "in_app,email");
+            sendToUser(customerId, title, body, "payment", "order", orderId, "in_app");
         }
         if (storeId != null) {
             sendToStore(storeId, title, body, "payment", "order", orderId, "in_app");
@@ -165,7 +177,7 @@ public class OrderNotificationHandler {
                     Map.of("orderNumber", orderNumber != null ? orderNumber : "",
                            "storeName", storeName != null ? storeName : "",
                            "cancelledBy", cancelledBy));
-            sendToUser(customerId, title, body, "order", "order", orderId, "in_app,email");
+            sendToUser(customerId, title, body, "order", "order", orderId, "in_app");
         }
     }
 
@@ -181,6 +193,10 @@ public class OrderNotificationHandler {
     }
 
     private void sendToUser(String userId, String title, String body, String type, String refType, String refId, String channel) {
+        sendToUser(userId, title, body, type, refType, refId, channel, null);
+    }
+
+    private void sendToUser(String userId, String title, String body, String type, String refType, String refId, String channel, String recipientEmail) {
         Notification n = new Notification();
         n.setUserId(userId);
         n.setTitle(title);
@@ -189,6 +205,7 @@ public class OrderNotificationHandler {
         n.setReferenceType(refType);
         n.setReferenceId(refId);
         n.setChannel(channel);
+        n.setRecipientEmail(recipientEmail);
         n.setSentAt(LocalDateTime.now());
         notificationService.createAndSend(n);
     }
@@ -204,6 +221,33 @@ public class OrderNotificationHandler {
         n.setChannel(channel);
         n.setSentAt(LocalDateTime.now());
         notificationService.createAndSend(n);
+    }
+
+    private String generateDeliveredEmail(String orderNumber, String storeName, String customerName, String customerEmail) {
+        return """
+            <!DOCTYPE html>
+            <html lang="vi">
+            <head><meta charset="UTF-8"></head>
+            <body style="font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px;">
+                <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background: #f97316; padding: 24px; text-align: center;">
+                        <h1 style="color: white; margin: 0; font-size: 1.3rem;">Don hang da giao thanh cong</h1>
+                    </div>
+                    <div style="padding: 24px;">
+                        <p style="font-size: 1rem; color: #333;">Xin chao <strong>%s</strong>,</p>
+                        <p style="color: #555;">Don hang <strong>#%s</strong> tu <strong>%s</strong> da duoc giao den ban.</p>
+                        <p style="color: #555;">Cam on ban da dat hang tai Foodara!</p>
+                        <div style="background: #fff7ed; border-radius: 4px; padding: 14px; margin: 20px 0; text-align: center;">
+                            <p style="margin: 0; color: #f97316; font-weight: 600;">Danh gia mon an de nhan uu dai!</p>
+                            <a href="http://localhost:5173/orders/%s" style="display: inline-block; margin-top: 10px; background: #f97316; color: white; padding: 8px 20px; border-radius: 4px; text-decoration: none; font-weight: 600;">Danh gia ngay</a>
+                        </div>
+                        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                        <p style="color: #999; font-size: 0.8rem; text-align: center;">Foodara</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(customerName, orderNumber, storeName != null ? storeName : "quan", orderNumber);
     }
 
     private String translateStatus(String status) {

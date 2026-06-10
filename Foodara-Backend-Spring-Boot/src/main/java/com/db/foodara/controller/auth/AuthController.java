@@ -32,6 +32,7 @@ public class AuthController {
     private final AuthService authService;
     private final IpLocationService ipLocationService;
     private final UserRoleService userRoleService;
+    private final org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
 
     @Value("${app.jwt.refresh-token-expiration-ms:2592000000}")
     private long refreshTokenExpirationMs;
@@ -56,6 +57,10 @@ public class AuthController {
         TokenResponse tokenResponse = authService.register(request, ipAddress, userAgent);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
         setAccessTokenCookie(response, tokenResponse.getAccessToken());
+
+        // Publish user.registered event for welcome email
+        publishUserRegistered(tokenResponse, request);
+
         return ApiResponse.success("Registration successful", toSafeToken(tokenResponse));
     }
 
@@ -238,5 +243,18 @@ public class AuthController {
     private ApiResponse<UserRole> saveUserRole(@RequestBody UserRoleRequest userRole){
         // userid name-role
         return ApiResponse.success(userRoleService.addUserRole(userRole));
+    }
+
+    private void publishUserRegistered(TokenResponse tokenResponse, RegisterRequest request) {
+        try {
+            java.util.Map<String, String> payload = java.util.Map.of(
+                "userId", request.getEmail(),
+                "name", request.getFullName() != null ? request.getFullName() : "Khách",
+                "email", request.getEmail() != null ? request.getEmail() : ""
+            );
+            rabbitTemplate.convertAndSend("foodara.events", "user.registered", payload);
+        } catch (Exception e) {
+            // Don't fail registration if notification fails
+        }
     }
 }

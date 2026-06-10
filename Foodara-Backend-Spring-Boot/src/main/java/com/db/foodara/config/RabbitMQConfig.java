@@ -1,5 +1,6 @@
 package com.db.foodara.config;
 
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -13,6 +14,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @Configuration
 public class RabbitMQConfig {
+
+    public static final String EXCHANGE = "foodara.events";
+
+    @Bean
+    public TopicExchange foodaraExchange() {
+        return new TopicExchange(EXCHANGE);
+    }
 
     @Bean
     public MessageConverter jsonMessageConverter() {

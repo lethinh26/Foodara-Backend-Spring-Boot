@@ -43,4 +43,12 @@ public class WebSocketNotificationService {
         log.info("Pushing notification to user: {}", topic);
         messagingTemplate.convertAndSend(topic, notification);
     }
+    /**
+     * Broadcast a system notification to all connected users.
+     */
+    public void sendBroadcast(String notificationType, Object payload) {
+        String topic = "/topic/broadcast";
+        log.info("Broadcasting {} to all users: {}", notificationType, topic);
+        messagingTemplate.convertAndSend(topic, payload);
+    }
 }

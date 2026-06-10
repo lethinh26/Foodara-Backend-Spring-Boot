@@ -133,4 +133,36 @@ public class AdminNotificationController {
         templateRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("status", "deleted"));
     }
+    /**
+     * Push promo/marketing notification to specific user or broadcast.
+     * Supports email channel with recipientEmail.
+     */
+    @PostMapping("/promo")
+    public ResponseEntity<Map<String, Object>> sendPromo(@RequestBody Map<String, Object> request) {
+        String title = (String) request.get("title");
+        String body = (String) request.get("body");
+        String channel = (String) request.getOrDefault("channel", "in_app,email");
+        String recipientEmail = (String) request.get("recipientEmail");
+        String userId = (String) request.get("userId");
+
+        if (title == null || body == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "title and body required"));
+        }
+
+        Notification n = new Notification();
+        n.setUserId(userId != null ? userId : "broadcast");
+        n.setTitle(title);
+        n.setBody(body);
+        n.setNotificationType("promotion");
+        n.setChannel(channel);
+        n.setRecipientEmail(recipientEmail);
+        n.setSentAt(LocalDateTime.now());
+        notificationService.createAndSend(n);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "sent",
+                "userId", userId != null ? userId : "broadcast",
+                "channel", channel
+        ));
+    }
 }

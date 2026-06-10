@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers("/v1/driver/**").hasRole("DRIVER")
                         // Health check
                         .requestMatchers("/actuator/**").permitAll()
+                        // Swagger
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

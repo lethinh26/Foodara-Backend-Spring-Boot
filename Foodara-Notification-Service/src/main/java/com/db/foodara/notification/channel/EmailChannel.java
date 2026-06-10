@@ -27,24 +27,24 @@ public class EmailChannel implements NotificationChannel {
 
     @Override
     public void send(Notification notification) {
+        String recipientEmail = notification.getRecipientEmail();
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            log.warn("[Email] Notification {} — no recipient email, skip", notification.getId());
+            return;
+        }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            // We need the user email, but Notification entity doesn't have it.
-            // The body should already be a rendered HTML from TemplateService.
-            // For now, log - actual email sending requires user email from event context.
-            log.warn("[Email] Notification {} - Cannot send email yet: user email not stored in entity. "
-                    + "Email dispatch requires user context from the event.",
-                    notification.getId());
+            helper.setTo(recipientEmail);
+            helper.setSubject(notification.getTitle());
+            helper.setText(notification.getBody(), true); // true = HTML
 
-            // TODO: Extend Notification entity with recipientEmail or pass email from event.
-            // helper.setTo(userEmail);
-            // helper.setSubject(subject);
-            // helper.setText(body, true);
-            // mailSender.send(message);
+            mailSender.send(message);
+            log.info("[Email] Sent to {} — {}", recipientEmail, notification.getTitle());
         } catch (MessagingException e) {
-            log.error("[Email] Failed to send notification {}: {}", notification.getId(), e.getMessage());
+            log.error("[Email] Failed to send to {}: {}", recipientEmail, e.getMessage());
         }
     }
 }

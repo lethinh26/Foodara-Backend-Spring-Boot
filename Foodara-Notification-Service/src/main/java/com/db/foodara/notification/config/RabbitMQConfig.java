@@ -21,6 +21,7 @@ public class RabbitMQConfig {
     public static final String PAYMENT_COMPLETED_QUEUE = "notification.payment.completed";
     public static final String ORDER_CANCELLED_QUEUE = "notification.order.cancelled";
     public static final String SYSTEM_NOTIFICATION_QUEUE = "notification.system";
+    public static final String USER_REGISTERED_QUEUE = "notification.user.registered";
 
     // Routing keys
     public static final String ORDER_PLACED_KEY = "order.placed";
@@ -28,6 +29,7 @@ public class RabbitMQConfig {
     public static final String PAYMENT_COMPLETED_KEY = "payment.completed";
     public static final String ORDER_CANCELLED_KEY = "order.cancelled";
     public static final String SYSTEM_NOTIFY_KEY = "system.notify";
+    public static final String USER_REGISTERED_KEY = "user.registered";
 
     @Bean
     public TopicExchange foodaraExchange() {
@@ -60,6 +62,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue userRegisteredQueue() {
+        return QueueBuilder.durable(USER_REGISTERED_QUEUE).build();
+    }
+
+    @Bean
     public Binding orderPlacedBinding(Queue orderPlacedQueue, TopicExchange exchange) {
         return BindingBuilder.bind(orderPlacedQueue).to(exchange).with(ORDER_PLACED_KEY);
     }
@@ -82,6 +89,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding systemNotifyBinding(Queue systemNotificationQueue, TopicExchange exchange) {
         return BindingBuilder.bind(systemNotificationQueue).to(exchange).with(SYSTEM_NOTIFY_KEY);
+    }
+
+    @Bean
+    public Binding userRegisteredBinding(Queue userRegisteredQueue, TopicExchange exchange) {
+        return BindingBuilder.bind(userRegisteredQueue).to(exchange).with(USER_REGISTERED_KEY);
     }
 
     @Bean
