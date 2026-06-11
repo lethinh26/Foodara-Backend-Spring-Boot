@@ -35,20 +35,7 @@ public class OrderNotificationHandler {
         String storeName = (String) event.get("storeName");
         BigDecimal totalAmount = toBigDecimal(event.get("totalAmount"));
 
-        // 1. Notify merchant via WebSocket (store-specific topic)
-        Map<String, Object> newOrderPayload = Map.of(
-            "orderId", orderId != null ? orderId : "",
-            "orderNumber", orderNumber != null ? orderNumber : "",
-            "customerName", customerName,
-            "storeName", storeName != null ? storeName : "",
-            "totalAmount", totalAmount != null ? totalAmount : BigDecimal.ZERO,
-            "placedAt", event.getOrDefault("placedAt", LocalDateTime.now().toString()).toString()
-        );
-        if (storeId != null) {
-            webSocketService.sendNewOrderToMerchant(storeId, newOrderPayload);
-        }
-
-        // 2. Notify customer (in-app + email)
+        // 1. Notify customer (in-app + email)
         String customerTitle = "\u0110\u01a1n h\u00e0ng #" + orderNumber + " \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u1eb7t th\u00e0nh c\u00f4ng";
         String customerBody = templateService.render("order_placed", "in_app",
                 Map.of("orderNumber", orderNumber != null ? orderNumber : "",
@@ -59,7 +46,7 @@ public class OrderNotificationHandler {
             sendToUser(customerId, customerTitle, customerBody, "order", "order", orderId, "in_app", customerEmail);
         }
 
-        // 3. Notify merchant (in-app) — persistence so bell shows
+        // 2. Notify merchant (in-app) — persistence so bell shows
         if (storeId != null) {
             String merchantTitle = "\u0110\u01a1n m\u1edbi #" + orderNumber + " t\u1eeb " + customerName;
             String merchantBody = templateService.render("new_order_merchant", "in_app",
@@ -67,6 +54,15 @@ public class OrderNotificationHandler {
                            "customerName", customerName,
                            "totalAmount", totalAmount != null ? totalAmount.toString() : "0"));
             sendToStore(storeId, merchantTitle, merchantBody, "order", "order", orderId, "in_app");
+
+            // Push via WS so OrderInbox receives new order real-time
+            webSocketService.sendNewOrderToMerchant(storeId, Map.of(
+                "orderId", orderId != null ? orderId : "",
+                "orderNumber", orderNumber != null ? orderNumber : "",
+                "customerName", customerName,
+                "totalAmount", totalAmount != null ? totalAmount : BigDecimal.ZERO,
+                "placedAt", event.getOrDefault("placedAt", LocalDateTime.now().toString()).toString()
+            ));
         }
     }
 
@@ -166,6 +162,8 @@ public class OrderNotificationHandler {
                                "customerName", (String) event.getOrDefault("customerName", "Kh\u00e1ch"),
                                "cancelledBy", cancelledBy));
                 sendToStore(storeId, title, body, "order", "order", orderId, "in_app");
+                // Push real-time WebSocket so merchant list auto-removes without refresh
+                webSocketService.sendOrderCancelledToMerchant(storeId, orderId);
             }
             return;
         }

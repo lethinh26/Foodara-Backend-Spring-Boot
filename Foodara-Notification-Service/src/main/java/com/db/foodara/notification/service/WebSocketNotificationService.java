@@ -1,5 +1,7 @@
 package com.db.foodara.notification.service;
 
+import java.util.Map;
+
 import com.db.foodara.notification.entity.Notification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,16 @@ public class WebSocketNotificationService {
     public void sendNewOrderToMerchant(String storeId, Object payload) {
         String topic = "/topic/merchant." + storeId + ".orders";
         log.info("Pushing new order to merchant: {}", topic);
+        messagingTemplate.convertAndSend(topic, payload);
+    }
+
+    /**
+     * Push order cancelled to merchant so the order disappears from list real-time.
+     */
+    public void sendOrderCancelledToMerchant(String storeId, String orderId) {
+        String topic = "/topic/merchant." + storeId + ".orders";
+        var payload = Map.of("type", "ORDER_CANCELLED", "orderId", orderId);
+        log.info("Pushing order cancelled to merchant: {} order={}", topic, orderId);
         messagingTemplate.convertAndSend(topic, payload);
     }
 

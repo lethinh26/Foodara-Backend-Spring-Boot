@@ -74,6 +74,10 @@ public class RefundService {
                             "voucherCode", voucher.getCode(),
                             "type", "voucher"));
 
+            // Mark refund status
+            order.setRefundStatus("voucher");
+            orderRepository.save(order);
+
             return Map.of(
                 "success", true,
                 "voucherCode", voucher.getCode(),
@@ -88,6 +92,11 @@ public class RefundService {
                         "customerId", order.getCustomerId(),
                         "amount", order.getTotalAmount(),
                         "type", "bank"));
+
+        // Mark refund status
+        order.setRefundStatus("bank");
+        orderRepository.save(order);
+
         return Map.of("success", true, "message", "Bank refund acknowledged");
     }
 }

@@ -236,21 +236,24 @@ public class CustomerOrderService {
         cartItemRepository.deleteAll(cartItems);
         cartRepository.delete(cart);
 
-        // 11. Publish event to RabbitMQ for Notification Service
-        try {
-            eventPublisher.publish(Map.of(
-                "orderId", savedOrder.getId(),
-                "orderNumber", savedOrder.getOrderNumber(),
-                "customerId", userId,
-                "customerName", user.getFullName(),
-                "customerEmail", user.getEmail(),
-                "storeId", savedOrder.getStoreId(),
-                "storeName", store.getName(),
-                "totalAmount", savedOrder.getTotalAmount(),
-                "placedAt", savedOrder.getPlacedAt().toString()
-            ), "order.placed");
-        } catch (Exception e) {
-            log.warn("Failed to publish order.placed event: {}", e.getMessage());
+        // 11. Publish event to RabbitMQ — only for COD orders (QR waits for payment)
+        boolean isQr = "qr".equalsIgnoreCase(request.getPaymentMethod());
+        if (!isQr) {
+            try {
+                eventPublisher.publish(Map.of(
+                    "orderId", savedOrder.getId(),
+                    "orderNumber", savedOrder.getOrderNumber(),
+                    "customerId", userId,
+                    "customerName", user.getFullName(),
+                    "customerEmail", user.getEmail(),
+                    "storeId", savedOrder.getStoreId(),
+                    "storeName", store.getName(),
+                    "totalAmount", savedOrder.getTotalAmount(),
+                    "placedAt", savedOrder.getPlacedAt().toString()
+                ), "order.placed");
+            } catch (Exception e) {
+                log.warn("Failed to publish order.placed event: {}", e.getMessage());
+            }
         }
 
         // 12. Build response
@@ -511,6 +514,26 @@ public class CustomerOrderService {
         order.setPaymentStatus(paymentStatus);
         orderRepository.save(order);
         log.info("Updated payment status for order {} to {}", orderNumber, paymentStatus);
+
+        // When QR payment confirmed → publish order.placed so merchant gets notified
+        if ("paid".equalsIgnoreCase(paymentStatus)) {
+            try {
+                User user = userRepository.findById(order.getCustomerId()).orElse(null);
+                eventPublisher.publish(Map.of(
+                    "orderId", order.getId(),
+                    "orderNumber", order.getOrderNumber(),
+                    "customerId", order.getCustomerId(),
+                    "customerName", user != null ? user.getFullName() : "Khách",
+                    "customerEmail", user != null ? user.getEmail() : "",
+                    "storeId", order.getStoreId(),
+                    "storeName", order.getStoreName(),
+                    "totalAmount", order.getTotalAmount(),
+                    "placedAt", order.getPlacedAt() != null ? order.getPlacedAt().toString() : ""
+                ), "order.placed");
+            } catch (Exception e) {
+                log.warn("Failed to publish order.placed event on payment: {}", e.getMessage());
+            }
+        }
     }
 
 

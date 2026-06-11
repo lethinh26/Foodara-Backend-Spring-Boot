@@ -55,6 +55,8 @@ public class OrderService {
     public List<MerchantOrderResponse> getOrders(String userId, String storeId) {
         ensureMerchantOwnsStore(userId, storeId);
         return orderRepository.findByStoreIdOrderByPlacedAtDesc(storeId).stream()
+                .filter(o -> !("qr".equalsIgnoreCase(o.getPaymentMethod())
+                        && "pending".equalsIgnoreCase(o.getPaymentStatus())))
                 .map(this::mapToResponse)
                 .toList();
     }

@@ -136,6 +136,9 @@ public class Order {
     @Column(name = "payment_status")
     private String paymentStatus; // pending, paid, failed
 
+    @Column(name = "refund_status")
+    private String refundStatus; // bank, voucher — null if not refunded
+
     // Time estimates
     @Column(name = "estimated_prep_time")
     private Integer estimatedPrepTime;
