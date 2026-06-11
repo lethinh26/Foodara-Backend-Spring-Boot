@@ -65,16 +65,29 @@ public class CartService {
     private final CartItemOptionRepository cartItemOptionRepository;
     private final VoucherService voucherService;
 
-    public CartResponse getCart(String userId) {
-        ensureUserExists(userId);
-        return cartRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId)
-                .map(cart -> mapCartResponse(cart, userId))
-                .orElseGet(() -> emptyCart(userId));
+    // ─── Public API ───────────────────────────────────────────────
+
+    public CartResponse getCart(String userId, String guestCartId) {
+        if (userId != null) {
+            ensureUserExists(userId);
+            return cartRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId)
+                    .map(cart -> mapCartResponse(cart, userId, null))
+                    .orElseGet(() -> emptyCart(userId, null));
+        }
+        if (guestCartId == null || guestCartId.isBlank()) {
+            return emptyCart(null, null);
+        }
+        return cartRepository.findFirstByGuestIdOrderByUpdatedAtDesc(guestCartId)
+                .map(cart -> mapCartResponse(cart, null, guestCartId))
+                .orElseGet(() -> emptyCart(null, guestCartId));
     }
 
     @Transactional
-    public CartResponse addItem(String userId, AddCartItemRequest request) {
-        ensureUserExists(userId);
+    public CartResponse addItem(String userId, String guestCartId, AddCartItemRequest request) {
+        if (userId == null && (guestCartId == null || guestCartId.isBlank())) {
+            guestCartId = java.util.UUID.randomUUID().toString();
+        }
+        if (userId != null) ensureUserExists(userId);
         validateAddRequest(request);
 
         Store store = storeRepository.findById(request.getStoreId())
@@ -83,7 +96,7 @@ public class CartService {
             throw new AppException(ErrorCode.CART_ITEM_UNAVAILABLE);
         }
 
-        Cart cart = resolveOrCreateActiveCart(userId, request.getStoreId());
+        Cart cart = resolveOrCreateActiveCart(userId, guestCartId, request.getStoreId());
         ResolvedCartSelection selection = resolveSelection(
                 request.getStoreId(),
                 request.getMenuItemId(),
@@ -92,7 +105,6 @@ public class CartService {
                 normalizeOptionIds(request.getOptionItemIds())
         );
 
-        // Check for existing item to stack: same menuItem/combo + same options + same note
         List<String> sortedNewOptionIds = normalizeOptionIds(request.getOptionItemIds()).stream()
                 .sorted()
                 .collect(Collectors.toList());
@@ -105,11 +117,9 @@ public class CartService {
                 sortedNewOptionIds,
                 newNote
         );
-        
 
         if (existingItem != null) {
             int newTotal = existingItem.getQuantity() + request.getQuantity();
-            // Re-validate total quantity against stock for tracked items
             if (selection.menuItem != null
                     && selection.menuItem.getStockQuantity() != null
                     && selection.menuItem.getStockQuantity() > 0
@@ -136,17 +146,17 @@ public class CartService {
         }
 
         touchCart(cart);
-        return mapCartResponse(cart, userId);
+        return mapCartResponse(cart, userId, guestCartId);
     }
 
     @Transactional
-    public CartResponse updateItem(String userId, String cartItemId, UpdateCartItemRequest request) {
-        ensureUserExists(userId);
+    public CartResponse updateItem(String userId, String guestCartId, String cartItemId, UpdateCartItemRequest request) {
+        if (userId != null) ensureUserExists(userId);
         if (request.getQuantity() == null || request.getQuantity() < 1) {
             throw new AppException(ErrorCode.CART_INVALID_REQUEST);
         }
 
-        CartItem cartItem = cartItemRepository.findByIdAndCartUserId(cartItemId, userId)
+        CartItem cartItem = findCartItemOwner(cartItemId, userId, guestCartId)
                 .orElseThrow(() -> new AppException(ErrorCode.CART_ITEM_NOT_FOUND));
 
         List<String> selectedOptionIds = request.getOptionItemIds();
@@ -174,13 +184,13 @@ public class CartService {
         cartItemOptionRepository.deleteByCartItemId(cartItemId);
         saveCartItemOptions(cartItem, selection.selectedOptions);
         touchCart(cartItem.getCart());
-        return mapCartResponse(cartItem.getCart(), userId);
+        return mapCartResponse(cartItem.getCart(), userId, guestCartId);
     }
 
     @Transactional
-    public CartResponse removeItem(String userId, String cartItemId) {
-        ensureUserExists(userId);
-        CartItem cartItem = cartItemRepository.findByIdAndCartUserId(cartItemId, userId)
+    public CartResponse removeItem(String userId, String guestCartId, String cartItemId) {
+        if (userId != null) ensureUserExists(userId);
+        CartItem cartItem = findCartItemOwner(cartItemId, userId, guestCartId)
                 .orElseThrow(() -> new AppException(ErrorCode.CART_ITEM_NOT_FOUND));
 
         Cart cart = cartItem.getCart();
@@ -189,25 +199,34 @@ public class CartService {
 
         if (cartItemRepository.countByCartId(cart.getId()) == 0) {
             cartRepository.delete(cart);
-            return emptyCart(userId);
+            return emptyCart(userId, guestCartId);
         }
 
         touchCart(cart);
-        return mapCartResponse(cart, userId);
+        return mapCartResponse(cart, userId, guestCartId);
     }
 
     @Transactional
-    public void clearCart(String userId) {
-        ensureUserExists(userId);
-        List<Cart> carts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId);
-        if (!carts.isEmpty()) {
-            cartRepository.deleteAll(carts);
+    public void clearCart(String userId, String guestCartId) {
+        if (userId != null) {
+            ensureUserExists(userId);
+            List<Cart> carts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+            if (!carts.isEmpty()) {
+                cartRepository.deleteAll(carts);
+            }
+            return;
+        }
+        if (guestCartId != null && !guestCartId.isBlank()) {
+            List<Cart> carts = cartRepository.findByGuestIdOrderByUpdatedAtDesc(guestCartId);
+            if (!carts.isEmpty()) {
+                cartRepository.deleteAll(carts);
+            }
         }
     }
 
-    public CartValidationResponse validateCart(String userId) {
-        ensureUserExists(userId);
-        Optional<Cart> cartOptional = cartRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId);
+    public CartValidationResponse validateCart(String userId, String guestCartId) {
+        if (userId != null) ensureUserExists(userId);
+        Optional<Cart> cartOptional = resolveCart(userId, guestCartId);
         if (cartOptional.isEmpty()) {
             return CartValidationResponse.builder()
                     .valid(false)
@@ -277,6 +296,8 @@ public class CartService {
                 .build();
     }
 
+    // ─── Private helpers ──────────────────────────────────────────
+
     private void ensureUserExists(String userId) {
         if (!userRepository.existsById(userId)) {
             throw new AppException(ErrorCode.USER_NOT_FOUND);
@@ -294,10 +315,35 @@ public class CartService {
         }
     }
 
-    private Cart resolveOrCreateActiveCart(String userId, String storeId) {
-        List<Cart> carts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+    private Optional<Cart> resolveCart(String userId, String guestCartId) {
+        if (userId != null) {
+            return cartRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId);
+        }
+        if (guestCartId != null && !guestCartId.isBlank()) {
+            return cartRepository.findFirstByGuestIdOrderByUpdatedAtDesc(guestCartId);
+        }
+        return Optional.empty();
+    }
+
+    private Optional<CartItem> findCartItemOwner(String cartItemId, String userId, String guestCartId) {
+        if (userId != null) {
+            return cartItemRepository.findByIdAndCartUserId(cartItemId, userId);
+        }
+        if (guestCartId != null && !guestCartId.isBlank()) {
+            return cartItemRepository.findByIdAndCartGuestId(cartItemId, guestCartId);
+        }
+        return Optional.empty();
+    }
+
+    private Cart resolveOrCreateActiveCart(String userId, String guestCartId, String storeId) {
+        List<Cart> carts;
+        if (userId != null) {
+            carts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        } else {
+            carts = cartRepository.findByGuestIdOrderByUpdatedAtDesc(guestCartId);
+        }
         if (carts.isEmpty()) {
-            return createCart(userId, storeId);
+            return createCart(userId, guestCartId, storeId);
         }
 
         Optional<Cart> sameStore = carts.stream()
@@ -315,12 +361,13 @@ public class CartService {
         }
 
         cartRepository.deleteAll(carts);
-        return createCart(userId, storeId);
+        return createCart(userId, guestCartId, storeId);
     }
 
-    private Cart createCart(String userId, String storeId) {
+    private Cart createCart(String userId, String guestCartId, String storeId) {
         Cart cart = new Cart();
         cart.setUserId(userId);
+        cart.setGuestId(guestCartId);
         cart.setStoreId(storeId);
         return cartRepository.save(cart);
     }
@@ -334,15 +381,12 @@ public class CartService {
     ) {
         List<CartItem> existingItems = cartItemRepository.findByCartIdOrderByCreatedAtAsc(cartId);
         for (CartItem item : existingItems) {
-            // Match menuItemId or comboId
             if (!Objects.equals(item.getMenuItemId(), menuItemId)) continue;
             if (!Objects.equals(item.getComboId(), comboId)) continue;
 
-            // Match special instructions
             String existingNote = item.getSpecialInstructions() != null ? item.getSpecialInstructions().trim() : "";
             if (!existingNote.equals(newNote)) continue;
 
-            // Match sorted option IDs
             List<String> existingOptionIds = cartItemOptionRepository
                     .findByCartItemIdOrderByCreatedAtAsc(item.getId()).stream()
                     .map(CartItemOption::getOptionItemId)
@@ -394,8 +438,6 @@ public class CartService {
             if (menuItem.getMaxQuantityPerOrder() != null && quantity > menuItem.getMaxQuantityPerOrder()) {
                 throw new AppException(ErrorCode.CART_INVALID_REQUEST);
             }
-            // Block when stock is explicitly 0 — regardless of trackInventory flag.
-            // This covers the case where merchant depleted stock via dashboard.
             if (menuItem.getStockQuantity() != null && menuItem.getStockQuantity() <= 0) {
                 throw new AppException(ErrorCode.MENU_ITEM_OUT_OF_STOCK,
                         menuItem.getName() != null ? menuItem.getName() : "Món #" + menuItemId);
@@ -445,7 +487,7 @@ public class CartService {
 
         BigDecimal basePrice = menuItem != null
                 ? defaultAmount(menuItem.getBasePrice())
-                : defaultAmount(Objects.requireNonNull(combo).getComboPrice());
+                : defaultAmount(combo.getComboPrice());
 
         return new ResolvedCartSelection(menuItem, combo, selectedOptions, scaleAmount(basePrice.add(optionTotal)));
     }
@@ -518,8 +560,14 @@ public class CartService {
         }
     }
 
-    private CartResponse mapCartResponse(Cart cart, String userId) {
+    // ─── Response mapping ─────────────────────────────────────────
+
+    private CartResponse mapCartResponse(Cart cart, String userId, String guestCartId) {
         List<CartItem> items = cartItemRepository.findByCartIdOrderByCreatedAtAsc(cart.getId());
+        if (items.isEmpty()) {
+            cartRepository.delete(cart);
+            return emptyCart(userId, guestCartId);
+        }
         List<String> cartItemIds = items.stream().map(CartItem::getId).collect(Collectors.toList());
 
         Map<String, List<CartItemOption>> optionMap = cartItemIds.isEmpty()
@@ -566,7 +614,9 @@ public class CartService {
                 .map(item -> safeLineTotal(item.getUnitPrice(), item.getQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        VoucherCartPricingResponse cartPricing = voucherService.getAvailableForCart(userId, cart.getStoreId());
+        VoucherCartPricingResponse cartPricing = userId != null
+                ? voucherService.getAvailableForCart(userId, cart.getStoreId())
+                : VoucherCartPricingResponse.builder().totalDiscount(BigDecimal.ZERO).build();
         BigDecimal totalDiscount = amount(cartPricing.getTotalDiscount());
 
         List<CartResponse.CartItemResponse> itemResponses = items.stream()
@@ -677,7 +727,7 @@ public class CartService {
                 .build();
     }
 
-    private CartResponse emptyCart(String userId) {
+    private CartResponse emptyCart(String userId, String guestCartId) {
         return CartResponse.builder()
                 .userId(userId)
                 .storeMinOrderAmount(BigDecimal.ZERO)

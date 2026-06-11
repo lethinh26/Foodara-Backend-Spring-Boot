@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "carts",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "store_id"})
+        name = "carts"
 )
 @Getter
 @Setter
@@ -19,12 +18,14 @@ public class Cart {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private String userId;
+
+    @Column(name = "guest_id")
+    private String guestId;
 
     @Column(name = "store_id", nullable = false)
     private String storeId;
-
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

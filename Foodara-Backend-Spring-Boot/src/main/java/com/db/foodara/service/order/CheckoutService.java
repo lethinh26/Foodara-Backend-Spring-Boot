@@ -53,7 +53,7 @@ public class CheckoutService {
 
         CheckoutDeliveryFeeResponse deliveryFee = calculateDeliveryFee(userId, request.getStoreId(), request.getAddressId());
         VoucherCartPricingResponse voucherPricing = resolveVoucherPricing(userId, request);
-        CartValidationResponse validation = cartService.validateCart(userId);
+        CartValidationResponse validation = cartService.validateCart(userId, null);
 
         BigDecimal platformDiscount = amount(voucherPricing.getAppliedPlatformVoucher() != null
                 ? voucherPricing.getAppliedPlatformVoucher().getPotentialDiscount()
