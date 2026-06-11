@@ -16,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -190,11 +192,38 @@ public class SearchService {
     // --- Private mapping methods ---
 
     private StoreResponse mapToStoreResponse(Store s, BigDecimal userLat, BigDecimal userLng) {
+        double distanceKm = 0;
+        if (userLat != null && userLng != null && s.getLatitude() != null && s.getLongitude() != null) {
+            distanceKm = calculateDistance(
+                    userLat.doubleValue(), userLng.doubleValue(),
+                    s.getLatitude().doubleValue(), s.getLongitude().doubleValue());
+        }
+
+        // Estimate delivery fee: 5000 VND/km base + 10000 base fee
+        BigDecimal deliveryFee = BigDecimal.valueOf(Math.max(10000, Math.round(distanceKm * 5000)));
+
+        // Estimate ETA: prep time + 3 min per km
+        int eta = (s.getAvgPreparationTime() != null ? s.getAvgPreparationTime() : 15)
+                + (int) Math.round(distanceKm * 3);
+
+        // Build location string
+        String location = s.getAddressLine();
+        if (location == null || location.isBlank()) {
+            location = Stream.of(s.getWard(), s.getDistrictName(), s.getCityName())
+                    .filter(v -> v != null && !v.isBlank())
+                    .collect(Collectors.joining(", "));
+        }
+
+        // isNew: created within last 30 days
+        boolean isNew = s.getCreatedAt() != null
+                && s.getCreatedAt().isAfter(LocalDateTime.now().minusDays(30));
+
         StoreResponse.StoreResponseBuilder builder = StoreResponse.builder()
                 .id(s.getId())
                 .name(s.getName())
                 .slug(s.getSlug())
                 .description(s.getDescription())
+                .phone(s.getPhone())
                 .addressLine(s.getAddressLine())
                 .ward(s.getWard())
                 .districtName(s.getDistrictName())
@@ -210,18 +239,14 @@ public class SearchService {
                 .totalOrders(s.getTotalOrders())
                 .coverImageUrl(s.getCoverImageUrl())
                 .logoUrl(s.getLogoUrl())
-                .createdAt(s.getCreatedAt());
-
-        if (userLat != null && userLng != null && s.getLatitude() != null && s.getLongitude() != null) {
-            BigDecimal distance = BigDecimal.valueOf(calculateDistance(
-                    userLat.doubleValue(), userLng.doubleValue(),
-                    s.getLatitude().doubleValue(), s.getLongitude().doubleValue()));
-            builder.distance(distance);
-        }
-
-        builder.hasPromotion(s.getTotalOrders() != null && s.getTotalOrders() > 10);
-        builder.isNew(false);
-        builder.isFeatured(s.getAvgRating() != null && s.getAvgRating().compareTo(BigDecimal.valueOf(4.5)) > 0);
+                .createdAt(s.getCreatedAt())
+                .distance(BigDecimal.valueOf(Math.round(distanceKm * 100.0) / 100.0))
+                .estimatedDeliveryTime(eta)
+                .deliveryFee(deliveryFee)
+                .location(location)
+                .hasPromotion(s.getTotalOrders() != null && s.getTotalOrders() > 10)
+                .isNew(isNew)
+                .isFeatured(s.getAvgRating() != null && s.getAvgRating().compareTo(BigDecimal.valueOf(4.5)) > 0);
 
         return builder.build();
     }

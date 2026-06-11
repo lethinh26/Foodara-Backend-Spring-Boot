@@ -48,6 +48,9 @@ public class StoreResponse {
     private Boolean isNew;
     private Boolean isFeatured;
 
+    // Location display
+    private String location;
+
     /**
      * True only when the store is currently accepting orders:
      *   - {@code isOpen=true}
