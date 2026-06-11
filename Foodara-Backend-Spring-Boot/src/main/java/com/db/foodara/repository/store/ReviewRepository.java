@@ -17,6 +17,8 @@ public interface ReviewRepository extends JpaRepository<Review, String> {
 
     List<Review> findByStoreIdAndStatusOrderByCreatedAtDesc(String storeId, String status);
 
+    Page<Review> findByStoreIdAndStatusOrderByCreatedAtDesc(String storeId, String status, Pageable pageable);
+
     Optional<Review> findByOrderIdAndUserId(String orderId, String userId);
 
     boolean existsByOrderIdAndUserId(String orderId, String userId);
@@ -30,7 +32,21 @@ public interface ReviewRepository extends JpaRepository<Review, String> {
     @Query("SELECT COUNT(r) FROM Review r WHERE r.storeId = :storeId AND r.status = 'active' AND r.storeRating IS NOT NULL")
     long countActiveByStoreId(@Param("storeId") String storeId);
 
+    /** Count reviews by store, status, and rating for breakdown. */
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.storeId = :storeId AND r.status = 'active' AND r.storeRating = :rating")
+    long countByStoreIdAndStatusAndRating(@Param("storeId") String storeId, @Param("rating") Short rating);
+
     // Admin queries
     Page<Review> findByStatus(String status, Pageable pageable);
     Page<Review> findByStoreId(String storeId, Pageable pageable);
+
+    @Query("SELECT r FROM Review r WHERE " +
+           "(:status IS NULL OR r.status = :status) AND " +
+           "(:rating IS NULL OR r.storeRating = :rating) AND " +
+           "(:search IS NULL OR LOWER(r.storeComment) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Review> findByFilters(
+            @Param("status") String status,
+            @Param("rating") Short rating,
+            @Param("search") String search,
+            Pageable pageable);
 }

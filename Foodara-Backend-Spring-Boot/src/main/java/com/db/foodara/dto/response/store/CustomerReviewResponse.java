@@ -30,6 +30,9 @@ public class CustomerReviewResponse {
     private String customerName;
     private String customerAvatar;
 
+    // Images
+    private List<ImageDto> images;
+
     @Getter
     @Setter
     @Builder
@@ -40,5 +43,15 @@ public class CustomerReviewResponse {
         private String menuItemName;
         private Integer rating;
         private String comment;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImageDto {
+        private String id;
+        private String imageUrl;
     }
 }

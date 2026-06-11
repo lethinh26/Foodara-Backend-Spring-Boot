@@ -57,10 +57,4 @@ public class StoreController {
     public ApiResponse<List<ComboResponse>> getCombos(@PathVariable String id) {
         return ApiResponse.success(storeService.getCombos(id));
     }
-
-    // C13: GET /v1/stores/:id/reviews
-    @GetMapping("/{id}/reviews")
-    public ApiResponse<List<ReviewResponse>> getReviews(@PathVariable String id) {
-        return ApiResponse.success(storeService.getReviews(id));
-    }
 }

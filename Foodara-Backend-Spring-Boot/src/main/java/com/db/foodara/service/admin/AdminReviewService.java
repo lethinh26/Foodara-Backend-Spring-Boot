@@ -44,14 +44,26 @@ public class AdminReviewService {
     );
 
 
-    public PageResponse<AdminReviewResponse> getReviews(int page, int size, String status, String storeId) {
+    public PageResponse<AdminReviewResponse> getReviews(int page, int size, String status, String rating, String search) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Review> reviewPage;
 
-        if (status != null && !status.isBlank()) {
-            reviewPage = reviewRepository.findByStatus(status, pageRequest);
-        } else if (storeId != null && !storeId.isBlank()) {
-            reviewPage = reviewRepository.findByStoreId(storeId, pageRequest);
+        Integer ratingInt = null;
+        if (rating != null && !rating.isBlank()) {
+            try { ratingInt = Integer.parseInt(rating); } catch (NumberFormatException ignored) {}
+        }
+
+        boolean hasFilter = (status != null && !status.isBlank())
+                || (ratingInt != null)
+                || (search != null && !search.isBlank());
+
+        if (hasFilter) {
+            Short ratingShort = ratingInt != null ? ratingInt.shortValue() : null;
+            reviewPage = reviewRepository.findByFilters(
+                    status != null && !status.isBlank() ? status : null,
+                    ratingShort,
+                    search != null && !search.isBlank() ? search : null,
+                    pageRequest);
         } else {
             reviewPage = reviewRepository.findAll(pageRequest);
         }
@@ -99,20 +111,28 @@ public class AdminReviewService {
      * List view: enriched with user/store/driver/order names, but NO items/images
      */
     private AdminReviewResponse mapToListResponse(Review r) {
-        return buildBaseResponse(r).build();
+        // Load images (first 3 thumbnails for list view)
+        List<AdminReviewResponse.ReviewImageDto> images = reviewImageRepository.findByReviewId(r.getId())
+                .stream()
+                .limit(3)
+                .map(this::mapImageToDto)
+                .toList();
+
+        return buildBaseResponse(r)
+                .images(images)
+                .imageCount((long) images.size())
+                .build();
     }
 
     /**
      * Detail view: includes items + images
      */
     private AdminReviewResponse mapToDetailResponse(Review r) {
-        // Load items
         List<AdminReviewResponse.ReviewItemDto> items = reviewItemRepository.findByReviewId(r.getId())
                 .stream()
                 .map(this::mapItemToDto)
                 .toList();
 
-        // Load images
         List<AdminReviewResponse.ReviewImageDto> images = reviewImageRepository.findByReviewId(r.getId())
                 .stream()
                 .map(this::mapImageToDto)
@@ -121,6 +141,7 @@ public class AdminReviewService {
         return buildBaseResponse(r)
                 .items(items)
                 .images(images)
+                .imageCount((long) images.size())
                 .build();
     }
 

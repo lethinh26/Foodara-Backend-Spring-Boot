@@ -5,6 +5,7 @@ import com.db.foodara.dto.response.store.CustomerReviewResponse;
 import com.db.foodara.entity.order.Order;
 import com.db.foodara.entity.store.Review;
 import com.db.foodara.entity.store.ReviewItem;
+import com.db.foodara.entity.store.ReviewImage;
 import com.db.foodara.entity.store.Store;
 import com.db.foodara.entity.user.User;
 import com.db.foodara.exception.AppException;
@@ -12,6 +13,7 @@ import com.db.foodara.exception.ErrorCode;
 import com.db.foodara.repository.order.OrderRepository;
 import com.db.foodara.repository.store.MenuItemRepository;
 import com.db.foodara.repository.store.ReviewItemRepository;
+import com.db.foodara.repository.store.ReviewImageRepository;
 import com.db.foodara.repository.store.ReviewRepository;
 import com.db.foodara.repository.store.StoreRepository;
 import com.db.foodara.repository.user.UserRepository;
@@ -35,6 +37,7 @@ public class CustomerReviewService {
 
     private final ReviewRepository reviewRepository;
     private final ReviewItemRepository reviewItemRepository;
+    private final ReviewImageRepository reviewImageRepository;
     private final OrderRepository orderRepository;
     private final StoreRepository storeRepository;
     private final UserRepository userRepository;
@@ -82,6 +85,16 @@ public class CustomerReviewService {
                 ri.setRating(itemReq.getRating().shortValue());
                 ri.setComment(itemReq.getComment());
                 reviewItemRepository.save(ri);
+            }
+        }
+
+        // Save review images
+        if (request.getImageUrls() != null && !request.getImageUrls().isEmpty()) {
+            for (String imageUrl : request.getImageUrls()) {
+                ReviewImage img = new ReviewImage();
+                img.setReviewId(saved.getId());
+                img.setImageUrl(imageUrl);
+                reviewImageRepository.save(img);
             }
         }
 
@@ -135,6 +148,7 @@ public class CustomerReviewService {
     private CustomerReviewResponse mapToResponse(Review r, String userId) {
         List<ReviewItem> items = reviewItemRepository.findByReviewId(r.getId());
         Map<String, String> menuItemNames = loadMenuItemNames(items);
+        List<ReviewImage> images = reviewImageRepository.findByReviewId(r.getId());
 
         return CustomerReviewResponse.builder()
                 .id(r.getId())
@@ -152,11 +166,15 @@ public class CustomerReviewService {
                         .rating(ri.getRating() != null ? ri.getRating().intValue() : null)
                         .comment(ri.getComment())
                         .build()).toList())
+                .images(images.stream().map(img -> CustomerReviewResponse.ImageDto.builder()
+                        .id(img.getId())
+                        .imageUrl(img.getImageUrl())
+                        .build()).toList())
                 .createdAt(r.getCreatedAt())
                 .build();
     }
 
-    /** Public view: include customer name/avatar, hide userId. */
+    /** Public view: include customer name/avatar, items, images, hide userId. */
     private CustomerReviewResponse mapToPublicResponse(Review r) {
         String customerName = "Ẩn danh";
         String customerAvatar = null;
@@ -168,6 +186,10 @@ public class CustomerReviewService {
             }
         }
 
+        List<ReviewItem> items = reviewItemRepository.findByReviewId(r.getId());
+        Map<String, String> menuItemNames = loadMenuItemNames(items);
+        List<ReviewImage> images = reviewImageRepository.findByReviewId(r.getId());
+
         return CustomerReviewResponse.builder()
                 .id(r.getId())
                 .storeRating(r.getStoreRating() != null ? r.getStoreRating().intValue() : null)
@@ -175,6 +197,16 @@ public class CustomerReviewService {
                 .customerName(customerName)
                 .customerAvatar(customerAvatar)
                 .isAnonymous(r.getIsAnonymous())
+                .items(items.stream().map(ri -> CustomerReviewResponse.ItemResponse.builder()
+                        .menuItemId(ri.getMenuItemId())
+                        .menuItemName(menuItemNames.getOrDefault(ri.getMenuItemId(), ""))
+                        .rating(ri.getRating() != null ? ri.getRating().intValue() : null)
+                        .comment(ri.getComment())
+                        .build()).toList())
+                .images(images.stream().map(img -> CustomerReviewResponse.ImageDto.builder()
+                        .id(img.getId())
+                        .imageUrl(img.getImageUrl())
+                        .build()).toList())
                 .createdAt(r.getCreatedAt())
                 .build();
     }

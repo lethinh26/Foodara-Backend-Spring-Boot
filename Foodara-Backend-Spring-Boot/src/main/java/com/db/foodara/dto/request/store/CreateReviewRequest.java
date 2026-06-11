@@ -35,6 +35,8 @@ public class CreateReviewRequest {
 
     private List<ReviewItemRequest> items;
 
+    private List<String> imageUrls;
+
     @Getter
     @Setter
     public static class ReviewItemRequest {

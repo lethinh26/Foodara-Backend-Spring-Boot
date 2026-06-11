@@ -118,6 +118,7 @@ public enum ErrorCode {
     DRIVER_NOT_FOUND(3001, "Driver not found"),
     REVIEW_NOT_FOUND(3002, "Review not found"),
     REVIEW_ALREADY_EXISTS(3003, "Bạn đã đánh giá đơn hàng này rồi"),
+    CANNOT_REVIEW_ORDER(3011, "Chỉ có thể đánh giá đơn hàng đã giao hoặc hoàn thành"),
     CONFIG_NOT_FOUND(3004, "Config not found"),
     CONFIG_NOT_EDITABLE(3005, "Config is not editable"),
     NOTIFICATION_NOT_FOUND(3006, "Notification not found"),

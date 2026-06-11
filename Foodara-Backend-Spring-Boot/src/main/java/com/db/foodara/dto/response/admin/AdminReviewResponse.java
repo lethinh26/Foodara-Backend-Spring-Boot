@@ -35,6 +35,9 @@ public class AdminReviewResponse {
     private List<ReviewImageDto> images;
     private List<ReviewItemDto> items;
 
+    // Count fields
+    private Long imageCount;
+
     @Getter
     @Setter
     @Builder

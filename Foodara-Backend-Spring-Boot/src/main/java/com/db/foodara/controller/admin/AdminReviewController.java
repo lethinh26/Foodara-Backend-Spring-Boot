@@ -21,8 +21,9 @@ public class AdminReviewController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String storeId) {
-        return ApiResponse.success(adminReviewService.getReviews(page, size, status, storeId));
+            @RequestParam(required = false) String rating,
+            @RequestParam(required = false) String search) {
+        return ApiResponse.success(adminReviewService.getReviews(page, size, status, rating, search));
     }
 
     @GetMapping("/{id}")
